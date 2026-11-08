@@ -1,0 +1,24 @@
+{
+  "name": "evenly",
+  "version": "1.1.0",
+  "description": "Split shared costs with anyone. No accounts, no daily limits, self-hosted.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Sun-sh902",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sun-sh902/evenly.git"
+  },
+  "homepage": "https://github.com/Sun-sh902/evenly#readme",
+  "bugs": "https://github.com/Sun-sh902/evenly/issues",
+  "keywords": ["expenses", "split", "bills", "splitwise-alternative", "self-hosted", "sqlite"],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/*.test.js"
+  }
+}

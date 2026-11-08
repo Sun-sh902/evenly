@@ -1,0 +1,10 @@
+.git
+.github
+.claude
+data
+docs
+test
+scripts
+node_modules
+*.db
+*.db-*
