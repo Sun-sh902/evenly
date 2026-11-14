@@ -32,9 +32,9 @@ struct GroupSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Group") {
-                    TextField("Name", text: $name)
-                    Picker("Currency", selection: $currency) {
+                Section(t("Group")) {
+                    TextField(t("Name"), text: $name)
+                    Picker(t("Currency"), selection: $currency) {
                         ForEach(Money.currencyCodes, id: \.self) { Text($0).tag($0) }
                     }
                 }
@@ -44,28 +44,28 @@ struct GroupSettingsView: View {
                         HStack(spacing: 12) {
                             Avatar(name: m.name, colorIndex: live.colorIndex(of: m.id), size: 30)
                             Text(m.name)
-                            if m.id == me { Text("you").font(.caption.weight(.semibold)).foregroundStyle(Color.brand) }
+                            if m.id == me { Text(t("you")).font(.caption.weight(.semibold)).foregroundStyle(Color.brand) }
                             Spacer()
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) { run { try await store.removeMember(m.id) } } label: { Label("Remove", systemImage: "trash") }
-                            Button { renameText = m.name; renaming = m } label: { Label("Rename", systemImage: "pencil") }.tint(.ink2)
+                            Button(role: .destructive) { run { try await store.removeMember(m.id) } } label: { Label(t("Remove"), systemImage: "trash") }
+                            Button { renameText = m.name; renaming = m } label: { Label(t("Rename"), systemImage: "pencil") }.tint(.ink2)
                         }
                         .contextMenu {
-                            Button { renameText = m.name; renaming = m } label: { Label("Rename", systemImage: "pencil") }
-                            Button(role: .destructive) { run { try await store.removeMember(m.id) } } label: { Label("Remove", systemImage: "trash") }
+                            Button { renameText = m.name; renaming = m } label: { Label(t("Rename"), systemImage: "pencil") }
+                            Button(role: .destructive) { run { try await store.removeMember(m.id) } } label: { Label(t("Remove"), systemImage: "trash") }
                         }
                     }
                     HStack {
-                        TextField("Add someone", text: $newPerson)
+                        TextField(t("Add someone"), text: $newPerson)
                             .textInputAutocapitalization(.words)
                             .onSubmit(addPerson)
-                        Button("Add", action: addPerson).disabled(newPerson.trimmingCharacters(in: .whitespaces).isEmpty)
+                        Button(t("Add"), action: addPerson).disabled(newPerson.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 } header: {
-                    Text("People")
+                    Text(t("People"))
                 } footer: {
-                    Text("Swipe left on a person to rename or remove them. People on existing expenses can't be removed.")
+                    Text(t("Swipe left on a person to rename or remove them. People on existing expenses can't be removed."))
                 }
 
                 if let error {
@@ -73,28 +73,28 @@ struct GroupSettingsView: View {
                 }
 
                 Section {
-                    Button("Delete this group", role: .destructive) { confirmDelete = true }
+                    Button(t("Delete this group"), role: .destructive) { confirmDelete = true }
                 } footer: {
-                    Text("Removes every expense and payment for everyone with the link. This cannot be undone.")
+                    Text(t("Removes every expense and payment for everyone with the link. This cannot be undone."))
                 }
             }
-            .navigationTitle("Group settings")
+            .navigationTitle(t("Group settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(t("Cancel")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    if busy { ProgressView() } else { Button("Save", action: save).fontWeight(.semibold) }
+                    if busy { ProgressView() } else { Button(t("Save"), action: save).fontWeight(.semibold) }
                 }
             }
-            .alert("Rename", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
-                TextField("Name", text: $renameText)
-                Button("Cancel", role: .cancel) {}
-                Button("Save") {
+            .alert(t("Rename"), isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+                TextField(t("Name"), text: $renameText)
+                Button(t("Cancel"), role: .cancel) {}
+                Button(t("Save")) {
                     if let m = renaming { run { try await store.renameMember(m.id, to: renameText) } }
                 }
             }
-            .confirmationDialog("Delete \(group.name)?", isPresented: $confirmDelete, titleVisibility: .visible) {
-                Button("Delete group", role: .destructive) {
+            .confirmationDialog(t("Delete %@?", group.name), isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button(t("Delete group"), role: .destructive) {
                     run {
                         try await store.deleteGroup()
                         dismiss()
@@ -102,7 +102,7 @@ struct GroupSettingsView: View {
                     }
                 }
             } message: {
-                Text("Everyone with the link loses access. This cannot be undone.")
+                Text(t("Everyone with the link loses access. This cannot be undone."))
             }
         }
         .tint(.ink)

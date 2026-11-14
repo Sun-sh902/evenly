@@ -5,18 +5,18 @@ enum SplitMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .equal: "Equally"
-        case .exact: "Exact"
-        case .shares: "Shares"
-        case .percent: "Percent"
+        case .equal: t("Equally")
+        case .exact: t("Exact")
+        case .shares: t("Shares")
+        case .percent: t("Percent")
         }
     }
     var summary: String {
         switch self {
-        case .equal: "split equally"
-        case .exact: "exact amounts"
-        case .shares: "by shares"
-        case .percent: "by percent"
+        case .equal: t("split equally")
+        case .exact: t("exact amounts")
+        case .shares: t("by shares")
+        case .percent: t("by percent")
         }
     }
 }
@@ -45,14 +45,14 @@ enum SplitCalculator {
         let ids = memberIds.filter { included.contains($0) }
         var shares = Dictionary(uniqueKeysWithValues: memberIds.map { ($0, 0) })
         guard !ids.isEmpty else {
-            return SplitPreview(shares: shares, isValid: false, message: "Pick at least one person", tone: .bad)
+            return SplitPreview(shares: shares, isValid: false, message: t("Pick at least one person"), tone: .bad)
         }
 
         switch mode {
         case .equal:
             for (i, v) in Money.allocate(total, weights: ids.map { _ in 1 }).enumerated() { shares[ids[i]] = v }
             let each = total / ids.count
-            let msg = total > 0 ? "\(format(each))\(total % ids.count == 0 ? "" : "+") each" : ""
+            let msg = total > 0 ? t("%@ each", format(each) + (total % ids.count == 0 ? "" : "+")) : ""
             return SplitPreview(shares: shares, isValid: total > 0, message: msg, tone: .neutral)
 
         case .exact:
@@ -66,9 +66,9 @@ enum SplitCalculator {
                 sum += v ?? 0
             }
             let left = total - sum
-            if !parsedAll { return SplitPreview(shares: shares, isValid: false, message: "Check the amounts", tone: .bad) }
-            if left == 0 && total > 0 { return SplitPreview(shares: shares, isValid: true, message: "Adds up exactly", tone: .good) }
-            let msg = left > 0 ? "\(format(left)) left to assign" : "\(format(-left)) over the total"
+            if !parsedAll { return SplitPreview(shares: shares, isValid: false, message: t("Check the amounts"), tone: .bad) }
+            if left == 0 && total > 0 { return SplitPreview(shares: shares, isValid: true, message: t("Adds up exactly"), tone: .good) }
+            let msg = left > 0 ? t("%@ left to assign", format(left)) : t("%@ over the total", format(-left))
             return SplitPreview(shares: shares, isValid: false, message: msg, tone: .bad)
 
         case .shares, .percent:
@@ -80,12 +80,12 @@ enum SplitCalculator {
             }
             if mode == .percent {
                 let diff = ((100 - sum) * 100).rounded() / 100
-                if diff == 0 { return SplitPreview(shares: shares, isValid: total > 0, message: "100% assigned", tone: .good) }
-                let msg = diff > 0 ? "\(clean(diff))% left to assign" : "\(clean(-diff))% too much"
+                if diff == 0 { return SplitPreview(shares: shares, isValid: total > 0, message: t("100% assigned"), tone: .good) }
+                let msg = diff > 0 ? t("%@%% left to assign", clean(diff)) : t("%@%% too much", clean(-diff))
                 return SplitPreview(shares: shares, isValid: false, message: msg, tone: .bad)
             }
-            if sum <= 0 { return SplitPreview(shares: shares, isValid: false, message: "Give someone a share", tone: .bad) }
-            return SplitPreview(shares: shares, isValid: total > 0, message: "\(clean(sum)) share\(sum == 1 ? "" : "s") in total", tone: .neutral)
+            if sum <= 0 { return SplitPreview(shares: shares, isValid: false, message: t("Give someone a share"), tone: .bad) }
+            return SplitPreview(shares: shares, isValid: total > 0, message: sum == 1 ? t("%@ share in total", clean(sum)) : t("%@ shares in total", clean(sum)), tone: .neutral)
         }
     }
 

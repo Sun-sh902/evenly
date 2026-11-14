@@ -6,7 +6,8 @@ struct APIError: LocalizedError, Equatable {
     let field: String?
 
     var errorDescription: String? {
-        message.prefix(1).uppercased() + message.dropFirst()
+        let text = translateError(message)
+        return text.prefix(1).uppercased() + text.dropFirst()
     }
 
     static func transport(_ error: Error) -> APIError {

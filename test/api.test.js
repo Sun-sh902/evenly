@@ -390,3 +390,14 @@ test('a missing date defaults to the local calendar day, not UTC', async () => {
   const local = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   assert.equal(r.json.group.entries[0].date, local);
 });
+
+test('entries with the same date and timestamp keep a stable newest-first order', async () => {
+  const g = (await api('POST', '/api/groups', { name: 'Order', members: ['A'] })).json;
+  const split = { mode: 'equal', participants: [{ memberId: g.members[0].id }] };
+  const titles = ['first', 'second', 'third', 'fourth', 'fifth'];
+  for (const title of titles) {
+    await api('POST', `/api/groups/${g.id}/entries`, { title, amount: '1', paidBy: g.members[0].id, date: '2026-01-01', split });
+  }
+  const got = (await api('GET', `/api/groups/${g.id}`)).json.entries.map((e) => e.title);
+  assert.deepEqual(got, [...titles].reverse());
+});

@@ -18,6 +18,7 @@ Both modes use the same rules. The on-device store (`LocalBackend.swift`, `Ledge
 - Group settings: rename, currency, add, rename or remove people, delete the group
 - CSV export through the share sheet
 - Light and dark mode, Dynamic Type friendly layouts, VoiceOver labels, haptics on save
+- English and Simplified Chinese, switchable in Settings (Follow system / English / 简体中文) and applied instantly without a restart
 
 ## Requirements
 
@@ -41,7 +42,7 @@ xcodebuild test -project ios/Evenly.xcodeproj -scheme Evenly \
   -destination 'platform=iOS Simulator,name=iPhone 16'
 ```
 
-Unit tests cover money parsing and formatting, split previews, invite link parsing, JSON decoding, the on-device store (splits, validation, persistence across restarts, CSV) and storage-mode switching. `LocalBackendTests.testParityWithRunningServer` runs the same scenario on the on-device store and a real server and requires identical balances, transfers and shares. `APITests.testEndToEndAgainstRunningServer` drives a real server through a full create, spend, settle and delete cycle. It is skipped when no server is running; set `EVENLY_TEST_SERVER` to point it elsewhere.
+Unit tests cover money parsing and formatting, split previews, invite link parsing, JSON decoding, the on-device store (splits, validation, persistence across restarts, CSV) and storage-mode switching. `LocalBackendTests.testParityWithRunningServer` runs the same scenario on the on-device store and a real server and requires identical balances, transfers and shares. `LocalizationTests` scans the app sources and fails if any on-screen string lacks a Chinese translation or has mismatched placeholders. `APITests.testEndToEndAgainstRunningServer` drives a real server through a full create, spend, settle and delete cycle. It is skipped when no server is running; set `EVENLY_TEST_SERVER` to point it elsewhere.
 
 ## Layout
 
@@ -52,6 +53,8 @@ Evenly/
   Models/Ledger.swift      Swift port of the server's split and settle-up logic
   Services/                backend protocol, on-device store, API client, app state, per-group store
   Design/                  colour tokens, typography, shared components
+  Design/Localization.swift  language setting and t() lookup
+  Design/Translations.swift  Simplified Chinese strings
   Views/                   home, create, join, group, expense, payment, settings
 EvenlyTests/               XCTest suites
 scripts/make-icon.swift    renders the app icon

@@ -14,8 +14,8 @@ struct JoinGroupView: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Join a group").font(.display(34)).tracking(-0.6)
-                    Text("Paste the invite link someone shared with you.").font(.system(size: 15)).foregroundStyle(Color.ink3)
+                    Text(t("Join a group")).font(.display(34)).tracking(-0.6)
+                    Text(t("Paste the invite link someone shared with you.")).font(.system(size: 15)).foregroundStyle(Color.ink3)
                 }
                 HStack {
                     TextField("http://host:4173/g/abc123", text: $text, axis: .vertical)
@@ -25,7 +25,7 @@ struct JoinGroupView: View {
                         .keyboardType(.URL)
                         .focused($focused)
                     if UIPasteboard.general.hasStrings {
-                        Button("Paste") { text = UIPasteboard.general.string ?? "" }
+                        Button(t("Paste")) { text = UIPasteboard.general.string ?? "" }
                             .font(.system(size: 15, weight: .semibold))
                     }
                 }
@@ -33,21 +33,21 @@ struct JoinGroupView: View {
                 .fieldStyle()
 
                 if let p = parsed, let server = p.server, AppState.normalize(server.absoluteString) != app.serverURL {
-                    Label("This link is on \(server.host ?? "another server"). Evenly will connect there.", systemImage: "info.circle")
+                    Label(t("This link is on %@. Evenly will connect there.", server.host ?? t("another server")), systemImage: "info.circle")
                         .font(.system(size: 13)).foregroundStyle(Color.ink2)
                 }
                 if let error {
                     Text(error).font(.system(size: 14, weight: .medium)).foregroundStyle(Color.neg)
                 }
                 Button {
-                    guard let p = parsed else { error = "That doesn't look like an Evenly link."; return }
+                    guard let p = parsed else { error = t("That doesn't look like an Evenly link."); return }
                     dismiss()
                     Task {
                         try? await Task.sleep(for: .milliseconds(350))
                         app.open(p)
                     }
                 } label: {
-                    Text("Open group").frame(maxWidth: .infinity)
+                    Text(t("Open group")).frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(text.isEmpty)
@@ -55,7 +55,7 @@ struct JoinGroupView: View {
             }
             .padding(20)
             .background(Color.paper.ignoresSafeArea())
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button(t("Cancel")) { dismiss() } } }
             .onAppear { focused = true }
         }
         .tint(.ink)

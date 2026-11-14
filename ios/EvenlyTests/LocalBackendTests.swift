@@ -167,6 +167,17 @@ final class LocalBackendTests: XCTestCase {
         await assertStatus(404) { _ = try await third.group(g.id, knownRevision: nil) }
     }
 
+    func testSameDayEntriesKeepNewestFirstOrder() async throws {
+        let b = makeBackend()
+        let g = try await b.createGroup(name: "Order", currency: "USD", members: ["A"])
+        let titles = ["first", "second", "third", "fourth", "fifth"]
+        for title in titles {
+            _ = try await b.addExpense(g.id, expense(title, "1", by: g.members[0].id, split: everyone(g), date: "2026-01-01"))
+        }
+        let got = try await b.group(g.id, knownRevision: nil)?.entries.map(\.title)
+        XCTAssertEqual(got, titles.reversed())
+    }
+
     func testCSVMatchesServerFormat() async throws {
         let b = makeBackend()
         let g = try await b.createGroup(name: "CSV", currency: "USD", members: ["Ann", "Bo"])
@@ -269,12 +280,7 @@ final class LocalBackendTests: XCTestCase {
 
 @MainActor
 final class StorageModeTests: XCTestCase {
-    private func freshDefaults() -> UserDefaults {
-        let name = "evenly-tests-\(UUID().uuidString)"
-        let d = UserDefaults(suiteName: name)!
-        d.removePersistentDomain(forName: name)
-        return d
-    }
+    private func freshDefaults() -> UserDefaults { makeTestDefaults(self) }
 
     private func tempFile() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("evenly-mode-\(UUID().uuidString)/groups.json")

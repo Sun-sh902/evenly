@@ -41,9 +41,9 @@ struct PaymentEditor: View {
                                 .font(.display(ExpenseEditor.amountFontSize(for: amount) - 8))
                                 .keyboardType(group.digits > 0 ? .decimalPad : .numberPad)
                                 .fixedSize()
-                                .accessibilityLabel("Amount")
+                                .accessibilityLabel(t("Amount"))
                         }
-                        Text("Money handed over outside the app, by cash or bank transfer.")
+                        Text(t("Money handed over outside the app, by cash or bank transfer."))
                             .font(.system(size: 13)).foregroundStyle(Color.ink3).multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
@@ -52,14 +52,14 @@ struct PaymentEditor: View {
                 }
 
                 Section {
-                    Picker("From", selection: $from) {
+                    Picker(t("From"), selection: $from) {
                         ForEach(group.members) { m in Text(m.name).tag(m.id) }
                     }
-                    Picker("To", selection: $to) {
+                    Picker(t("To"), selection: $to) {
                         ForEach(group.members) { m in Text(m.name).tag(m.id) }
                     }
-                    DatePicker("Date", selection: $date, displayedComponents: .date)
-                        .environment(\.locale, Locale(identifier: "en_US"))
+                    DatePicker(t("Date"), selection: $date, displayedComponents: .date)
+                        .environment(\.locale, Localizer.shared.locale)
                 }
 
                 if let error {
@@ -68,22 +68,22 @@ struct PaymentEditor: View {
 
                 if entry != nil {
                     Section {
-                        Button("Delete payment", role: .destructive) { confirmDelete = true }
+                        Button(t("Delete payment"), role: .destructive) { confirmDelete = true }
                     }
                 }
             }
             .scrollContentBackground(.hidden)
             .background(Color.paper.ignoresSafeArea())
-            .navigationTitle(entry == nil ? "Record a payment" : "Edit payment")
+            .navigationTitle(entry == nil ? t("Record a payment") : t("Edit payment"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(t("Cancel")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    if saving { ProgressView() } else { Button(entry == nil ? "Record" : "Save") { save() }.fontWeight(.semibold) }
+                    if saving { ProgressView() } else { Button(entry == nil ? t("Record") : t("Save")) { save() }.fontWeight(.semibold) }
                 }
             }
-            .confirmationDialog("Delete this payment?", isPresented: $confirmDelete, titleVisibility: .visible) {
-                Button("Delete", role: .destructive) { remove() }
+            .confirmationDialog(t("Delete this payment?"), isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button(t("Delete"), role: .destructive) { remove() }
             }
         }
         .tint(.ink)
@@ -91,8 +91,8 @@ struct PaymentEditor: View {
     }
 
     private func save() {
-        guard let minor = Money.parse(amount, digits: group.digits), minor > 0 else { error = "Enter an amount."; return }
-        guard from != to else { error = "Pick two different people."; return }
+        guard let minor = Money.parse(amount, digits: group.digits), minor > 0 else { error = t("Enter an amount."); return }
+        guard from != to else { error = t("Pick two different people."); return }
         saving = true
         let payload = TransferPayload(
             amount: Money.plain(minor, digits: group.digits), paidBy: from, to: to,
@@ -103,7 +103,7 @@ struct PaymentEditor: View {
             do {
                 try await store.savePayment(payload, editing: entry?.id)
                 dismiss()
-                onSaved(entry == nil ? "\(group.name(of: from)) paid \(group.name(of: to))" : "Payment updated")
+                onSaved(entry == nil ? t("%@ paid %@", group.name(of: from), group.name(of: to)) : t("Payment updated"))
             } catch {
                 self.error = error.localizedDescription
             }
@@ -118,7 +118,7 @@ struct PaymentEditor: View {
             do {
                 try await store.deleteEntry(entry.id)
                 dismiss()
-                onSaved("Payment deleted")
+                onSaved(t("Payment deleted"))
             } catch {
                 self.error = error.localizedDescription
             }

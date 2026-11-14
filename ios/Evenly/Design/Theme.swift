@@ -51,15 +51,15 @@ struct CategoryStyle {
 
     static func of(_ key: String) -> CategoryStyle {
         switch key {
-        case "food": CategoryStyle(label: "Food & drink", symbol: "fork.knife", color: Color(hex: 0xD9822B))
-        case "groceries": CategoryStyle(label: "Groceries", symbol: "basket", color: Color(hex: 0x5F9A2C))
-        case "transport": CategoryStyle(label: "Transport", symbol: "car", color: Color(hex: 0x2F7FD8))
-        case "stay": CategoryStyle(label: "Stay", symbol: "bed.double", color: Color(hex: 0x8D5BD6))
-        case "fun": CategoryStyle(label: "Fun", symbol: "ticket", color: Color(hex: 0xD0467F))
-        case "utilities": CategoryStyle(label: "Bills", symbol: "bolt", color: Color(hex: 0xC8A21A))
-        case "shopping": CategoryStyle(label: "Shopping", symbol: "bag", color: Color(hex: 0x2B9BB0))
-        case "transfer": CategoryStyle(label: "Settlement", symbol: "arrow.left.arrow.right", color: Color(hex: 0x1D8A63))
-        default: CategoryStyle(label: "General", symbol: "doc.text", color: Color(hex: 0x7A7F8C))
+        case "food": CategoryStyle(label: t("Food & drink"), symbol: "fork.knife", color: Color(hex: 0xD9822B))
+        case "groceries": CategoryStyle(label: t("Groceries"), symbol: "basket", color: Color(hex: 0x5F9A2C))
+        case "transport": CategoryStyle(label: t("Transport"), symbol: "car", color: Color(hex: 0x2F7FD8))
+        case "stay": CategoryStyle(label: t("Stay"), symbol: "bed.double", color: Color(hex: 0x8D5BD6))
+        case "fun": CategoryStyle(label: t("Fun"), symbol: "ticket", color: Color(hex: 0xD0467F))
+        case "utilities": CategoryStyle(label: t("Bills"), symbol: "bolt", color: Color(hex: 0xC8A21A))
+        case "shopping": CategoryStyle(label: t("Shopping"), symbol: "bag", color: Color(hex: 0x2B9BB0))
+        case "transfer": CategoryStyle(label: t("Settlement"), symbol: "arrow.left.arrow.right", color: Color(hex: 0x1D8A63))
+        default: CategoryStyle(label: t("General"), symbol: "doc.text", color: Color(hex: 0x7A7F8C))
         }
     }
 }

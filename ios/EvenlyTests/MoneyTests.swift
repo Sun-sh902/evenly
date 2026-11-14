@@ -2,6 +2,17 @@ import XCTest
 @testable import Evenly
 
 final class MoneyTests: XCTestCase {
+    private var savedLanguage: AppLanguage = .system
+    override func setUp() {
+        super.setUp()
+        savedLanguage = Localizer.shared.choice
+        Localizer.shared.choice = .english // these tests assert English text
+    }
+    override func tearDown() {
+        Localizer.shared.choice = savedLanguage
+        super.tearDown()
+    }
+
     func testParseMatchesServerRules() {
         XCTAssertEqual(Money.parse("12.34", digits: 2), 1234)
         XCTAssertEqual(Money.parse("12.3", digits: 2), 1230)
