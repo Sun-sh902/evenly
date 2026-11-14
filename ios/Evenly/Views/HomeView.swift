@@ -5,6 +5,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(AppState.self) private var app
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showCreate = false
     @State private var showJoin = false
     @State private var showServer = false
@@ -52,7 +53,9 @@ struct HomeView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
+                // 16pt: the system's own margin, so content lines up with the toolbar's
+                // settings button above it (measured: it sat 4.6pt further out at 20pt).
+                .padding(.horizontal, 16)
                 .padding(.top, 6)
                 .padding(.bottom, 130)
             }
@@ -93,7 +96,12 @@ struct HomeView: View {
             .onChange(of: cards.map(\.id)) { _, ids in
                 if let e = selection.expanded, !ids.contains(e) { selection.expanded = nil }
             }
-            .refreshable { await refresh() }
+            // No pull-to-refresh here: local data is always current, and the spinner had
+            // nowhere to sit under the transparent bar, so it overlapped the balance on the
+            // bounce. Home reloads on appear, on return from a group, and on foreground.
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await refresh() } }
+            }
             .toast($app.pendingNotice)
             .sensoryFeedback(.success, trigger: savedTick)
         }
@@ -206,12 +214,21 @@ private struct BalanceSummary: View {
             Text(dashboard.knowsYou ? t("Net balance") : t("Spent this month"))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.ink3)
+                // Above the number, whose paper-coloured roll fade reaches up under the label.
+                .zIndex(1)
 
             let headline = format(value, dashboard.knowsYou && value != 0)
+            let size = RollingNumber.fittedSize(for: headline)
             // Serif to match the group screen's titles; digits roll when the balance changes.
-            RollingNumber(text: headline, size: RollingNumber.fittedSize(for: headline), tracking: -1.2)
+            RollingNumber(text: headline, size: size, tracking: -1.2)
                 .foregroundStyle(Color.ink)
-                .padding(.vertical, -6)
+                // The wheel's line box adds air above the digits; pull the number up so the
+                // label sits closer to it than the figures below do (it labels the number).
+                .padding(.top, -14)
+                .padding(.bottom, -6)
+                // Optical alignment: the serif's first glyph has ~5% side bearing, which left
+                // the number's ink 3pt right of the label above it.
+                .offset(x: -size * 0.054)
                 .blur(radius: reduceMotion ? 0 : (1 - focus) * 12)
                 .opacity(0.15 + 0.85 * focus)
                 .onAppear {

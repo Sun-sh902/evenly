@@ -80,8 +80,9 @@ struct RollingNumber: View {
                         .frame(height: line * 0.2)
                 }
                 .overlay(alignment: .bottom) {
+                    // Thinner than the top fade: the comma's tail reaches down into this band.
                     LinearGradient(colors: [fade.opacity(0), fade], startPoint: .top, endPoint: .bottom)
-                        .frame(height: line * 0.2)
+                        .frame(height: line * 0.1)
                 }
                 .allowsHitTesting(false)
                 .animation(.spring(response: 0.55, dampingFraction: 1), value: text)
