@@ -440,7 +440,7 @@ private struct SettleCard: View {
     }
 }
 
-private struct ActivitySection: View {
+struct ActivitySection: View {
     let group: GroupSnapshot
     let me: String?
     @Binding var query: String
@@ -449,7 +449,8 @@ private struct ActivitySection: View {
     let onAdd: () -> Void
 
     private var visible: [Entry] {
-        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        let q = query.trimmingCharacters(in: .whitespaces)
+        let names = Dictionary(uniqueKeysWithValues: group.members.map { ($0.id, $0.name) })
         return group.entries.filter { e in
             switch filter {
             case .all: break
@@ -457,12 +458,15 @@ private struct ActivitySection: View {
             case .payments: if !e.isTransfer { return false }
             }
             guard !q.isEmpty else { return true }
-            let hay = "\(e.title) \(e.note) \(group.name(of: e.paidBy)) \(CategoryStyle.of(e.category).label)".lowercased()
-            return hay.contains(q)
+            // Case-insensitive search without building and lowercasing a string per entry.
+            return e.title.localizedCaseInsensitiveContains(q) || e.note.localizedCaseInsensitiveContains(q)
+                || (names[e.paidBy] ?? "").localizedCaseInsensitiveContains(q)
+                || CategoryStyle.of(e.category).label.localizedCaseInsensitiveContains(q)
         }
     }
 
     var body: some View {
+        let days = Self.days(visible)
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(t("Activity")).font(.display(28)).tracking(-0.5)
@@ -492,12 +496,13 @@ private struct ActivitySection: View {
 
             if group.entries.isEmpty {
                 empty
-            } else if visible.isEmpty {
+            } else if days.isEmpty {
                 Text(t("No matches. Try a different search or filter."))
                     .font(.system(size: 15)).foregroundStyle(Color.ink3)
                     .frame(maxWidth: .infinity).padding(.vertical, 32)
             } else {
-                VStack(spacing: 0) {
+                // Lazy so a long history only builds the rows on screen, not every row at once.
+                LazyVStack(spacing: 0) {
                     ForEach(days, id: \.date) { day in
                         HStack {
                             Text(Day.label(day.date)).sectionTitle()
@@ -518,7 +523,7 @@ private struct ActivitySection: View {
         }
     }
 
-    private var days: [(date: String, items: [Entry])] {
+    private static func days(_ visible: [Entry]) -> [(date: String, items: [Entry])] {
         var order: [String] = []
         var map: [String: [Entry]] = [:]
         for e in visible {

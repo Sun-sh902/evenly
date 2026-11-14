@@ -41,6 +41,7 @@ struct Dashboard: Equatable {
     var primary: Totals? { totals.first }
 
     static let monthsShown = 6
+    static let recentCount = 5
 
     static func build(groups: [GroupSnapshot], me: (GroupSnapshot) -> String?, now: Date = Date(),
                       calendar: Calendar = .current) -> Dashboard {
@@ -50,17 +51,17 @@ struct Dashboard: Equatable {
         var activity: [Activity] = []
         var knowsYou = false
 
-        let monthStarts: [Date] = (0..<monthsShown).reversed().compactMap { back in
-            calendar.date(byAdding: .month, value: -back, to: calendar.dateInterval(of: .month, for: now)!.start)
+        // Entry dates are "YYYY-MM-DD", so the month is just the first seven characters.
+        // Comparing those strings is far cheaper than parsing every date.
+        let thisMonth = calendar.dateInterval(of: .month, for: now)!.start
+        var monthSlot: [Substring: Int] = [:]
+        for back in 0..<monthsShown {
+            guard let start = calendar.date(byAdding: .month, value: -back, to: thisMonth) else { continue }
+            let c = calendar.dateComponents([.year, .month], from: start)
+            monthSlot[Substring(String(format: "%04d-%02d", c.year ?? 0, c.month ?? 0))] = monthsShown - 1 - back
         }
-        func monthIndex(_ day: String) -> Int? {
-            guard let d = Day.date(from: day) else { return nil }
-            for (i, start) in monthStarts.enumerated().reversed() where d >= start {
-                let end = calendar.date(byAdding: .month, value: 1, to: start)!
-                return d < end ? i : nil
-            }
-            return nil
-        }
+        func monthIndex(_ day: String) -> Int? { monthSlot[day.prefix(7)] }
+        let oldestMonth = monthSlot.min { $0.value < $1.value }?.key ?? ""
 
         for g in groups {
             var t = byCurrency[g.currency] ?? Totals(currency: g.currency, digits: g.digits, monthly: Array(repeating: 0, count: monthsShown))
@@ -71,15 +72,17 @@ struct Dashboard: Equatable {
                 let net = g.net(of: mine)
                 if net > 0 { t.owedToYou += net } else { t.youOwe -= net }
             }
-            for e in g.entries where !e.isTransfer {
-                if let i = monthIndex(e.date) {
-                    t.monthly[i] += e.amount
-                    if i == monthsShown - 1 { t.spentThisMonth += e.amount }
-                }
+            for e in g.entries {
+                // Entries are newest first: once one is older than the oldest month shown, so are the rest.
+                if e.date.prefix(7) < oldestMonth { break }
+                guard !e.isTransfer, let i = monthIndex(e.date) else { continue }
+                t.monthly[i] += e.amount
+                if i == monthsShown - 1 { t.spentThisMonth += e.amount }
             }
             byCurrency[g.currency] = t
             summaries.append(GroupSummary(group: g, yourNet: mine.map { g.net(of: $0) }))
-            activity += g.entries.map { Activity(entry: $0, groupId: g.id, groupName: g.name, currency: g.currency, digits: g.digits) }
+            // Snapshots list entries newest first, so only each group's first few can make the top five.
+            activity += g.entries.prefix(recentCount).map { Activity(entry: $0, groupId: g.id, groupName: g.name, currency: g.currency, digits: g.digits) }
         }
 
         let totals = byCurrency.values.sorted {
@@ -91,6 +94,6 @@ struct Dashboard: Equatable {
         let recent = activity.sorted {
             $0.entry.date != $1.entry.date ? $0.entry.date > $1.entry.date : $0.entry.createdAt > $1.entry.createdAt
         }
-        return Dashboard(totals: totals, groups: summaries, recent: Array(recent.prefix(5)), knowsYou: knowsYou)
+        return Dashboard(totals: totals, groups: summaries, recent: Array(recent.prefix(recentCount)), knowsYou: knowsYou)
     }
 }

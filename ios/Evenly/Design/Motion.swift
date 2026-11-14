@@ -1,5 +1,23 @@
 import SwiftUI
 import CoreMotion
+import UIKit
+
+// MARK: - Haptics
+
+/// One long-lived generator, woken ahead of time. A feedback generator used cold has to
+/// spin up the Taptic Engine on the main thread, which cost visible frames on a real iPhone.
+@MainActor
+enum Haptics {
+    private static let selectionGenerator = UISelectionFeedbackGenerator()
+
+    /// Call when a gesture begins (touch-down) so the engine is ready by the time it fires.
+    static func prepareSelection() { selectionGenerator.prepare() }
+
+    static func selection() {
+        selectionGenerator.selectionChanged()
+        selectionGenerator.prepare()
+    }
+}
 
 // MARK: - Rolling number
 
@@ -12,6 +30,8 @@ struct RollingNumber: View {
     var weight: Font.Weight = .regular
     var design: Font.Design = .serif
     var tracking: CGFloat = 0
+    /// The colour behind the number, used for the fade at the wheel edges.
+    var fade: Color = .paper
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -52,11 +72,18 @@ struct RollingNumber: View {
                     }
                 }
                 .tracking(tracking)
-                .mask(
-                    LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.17),
-                                           .init(color: .black, location: 0.83), .init(color: .clear, location: 1)],
-                                   startPoint: .top, endPoint: .bottom)
-                )
+                // Digits slide in from behind a fade in the page colour at the top and bottom.
+                // An overlay rather than a mask: a mask is re-composited off-screen on every
+                // frame anything else on the screen animates.
+                .overlay(alignment: .top) {
+                    LinearGradient(colors: [fade, fade.opacity(0)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: line * 0.2)
+                }
+                .overlay(alignment: .bottom) {
+                    LinearGradient(colors: [fade.opacity(0), fade], startPoint: .top, endPoint: .bottom)
+                        .frame(height: line * 0.2)
+                }
+                .allowsHitTesting(false)
                 .animation(.spring(response: 0.55, dampingFraction: 1), value: text)
             }
         }
@@ -117,8 +144,11 @@ final class DeviceTilt {
         // Held naturally the phone leans back about 40°, so that is the resting point.
         let tx = max(-1, min(1, a.roll / 0.6))
         let ty = max(-1, min(1, (a.pitch - 0.7) / 0.6))
-        x += (tx - x) * 0.12
-        y += (ty - y) * 0.12
+        let nx = x + (tx - x) * 0.12
+        let ny = y + (ty - y) * 0.12
+        // Every write redraws every card's sheen, so ignore movement too small to see
+        // (about a third of a point). A phone lying still then costs no redraws at all.
+        if abs(nx - x) > 0.002 || abs(ny - y) > 0.002 { x = nx; y = ny }
     }
 }
 
@@ -140,7 +170,6 @@ struct CardSheen: View {
                 .offset(x: -g.size.width * 0.5 + CGFloat(dx) * g.size.width * 0.4,
                         y: CGFloat(dy) * 30 - 20)
         }
-        .blendMode(.plusLighter)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }

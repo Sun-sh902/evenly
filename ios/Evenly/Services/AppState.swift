@@ -108,30 +108,75 @@ final class AppState {
     }
 
     func refreshLocalGroups() async {
-        localGroups = (try? await local.listGroups()) ?? []
+        let fresh = (try? await local.listGroups()) ?? []
+        // Reassigning identical data would still redraw everything watching the list.
+        if !Self.sameVersions(fresh, localGroups) { localGroups = fresh }
+    }
+
+    /// Same groups, in the same order, at the same revisions.
+    nonisolated static func sameVersions(_ a: [GroupSnapshot], _ b: [GroupSnapshot]) -> Bool {
+        a.count == b.count && zip(a, b).allSatisfy { $0.id == $1.id && $0.revision == $1.revision && $0.updatedAt == $1.updatedAt }
     }
 
     /// Groups with full data for the home dashboard in the current mode.
     var dashboardGroups: [GroupSnapshot] { isLocal ? localGroups : serverGroups }
 
+    /// The home dashboard, rebuilt only when a group, "which one are you" or the day changes,
+    /// not on every redraw of the home screen (opening a card, a press, a toast).
+    func dashboard(now: Date = Date()) -> Dashboard {
+        _ = meVersion // observe identity changes
+        let groups = dashboardGroups
+        var key = Hasher()
+        key.combine(meVersion)
+        key.combine(Day.string(from: now))
+        for g in groups { key.combine(g.id); key.combine(g.revision); key.combine(g.updatedAt) }
+        let k = key.finalize()
+        if let cached = dashboardCache, cached.key == k { return cached.value }
+        let value = Dashboard.build(groups: groups, me: { self.me(in: $0) }, now: now)
+        dashboardCache = (k, value)
+        return value
+    }
+
+    @ObservationIgnored private var dashboardCache: (key: Int, value: Dashboard)?
+
+    /// False until the home screen's first load finishes, so it doesn't flash the
+    /// "no groups yet" introduction for a moment at launch.
+    private(set) var homeLoaded = false
+
     /// Reloads whatever the home screen needs for the current mode.
     func refreshHome() async {
+        defer { if !homeLoaded { homeLoaded = true } }
         if isLocal {
             await refreshLocalGroups()
             return
         }
         guard let client else { serverGroups = []; return }
         let ids = recents.map(\.id)
+        // Ask with the revision we already have: an unchanged group costs a 304 with no body.
+        let origin = serverAddress
+        let known = serverGroupsOrigin == origin
+            ? Dictionary(serverGroups.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }) : [:]
         var fetched: [String: GroupSnapshot] = [:]
         await withTaskGroup(of: (String, GroupSnapshot?).self) { tasks in
             for id in ids {
-                tasks.addTask { (id, try? await client.group(id)) }
+                let cached = known[id]
+                tasks.addTask {
+                    do {
+                        return (id, try await client.group(id, knownRevision: cached?.revision) ?? cached)
+                    } catch {
+                        return (id, nil)
+                    }
+                }
             }
             for await (id, g) in tasks { if let g { fetched[id] = g } }
         }
         // Keep the "most recently opened first" order; unreachable groups are simply left out.
-        serverGroups = ids.compactMap { fetched[$0] }
+        let next = ids.compactMap { fetched[$0] }
+        serverGroupsOrigin = origin
+        if !Self.sameVersions(next, serverGroups) { serverGroups = next }
     }
+
+    @ObservationIgnored private var serverGroupsOrigin: String?
 
     func remember(_ g: GroupSnapshot) {
         if mode == .device {
