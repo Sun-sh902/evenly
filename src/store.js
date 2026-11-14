@@ -46,7 +46,12 @@ function cleanText(value, field, max, { required = true } = {}) {
 }
 
 function cleanDate(value) {
-  if (value === undefined || value === null || value === '') return new Date().toISOString().slice(0, 10);
+  if (value === undefined || value === null || value === '') {
+    // Default to the server's local calendar day. Using the UTC date here put
+    // evening expenses on tomorrow for anyone west of Greenwich.
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new ValidationError('date must be YYYY-MM-DD', 'date');
   const d = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value) throw new ValidationError('date is not a real calendar day', 'date');
