@@ -149,15 +149,3 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
 }
-
-struct BrandMark: View {
-    var size: CGFloat = 26
-    var body: some View {
-        ZStack {
-            Circle().stroke(Color.ink, lineWidth: size * 0.08).frame(width: size * 0.62).offset(x: -size * 0.13)
-            Circle().stroke(Color.brand, lineWidth: size * 0.08).frame(width: size * 0.62).offset(x: size * 0.13)
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
-    }
-}

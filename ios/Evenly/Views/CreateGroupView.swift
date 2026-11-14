@@ -66,12 +66,14 @@ struct CreateGroupView: View {
                             TextField(people.isEmpty ? t("Type a name, then return") : t("Add another"), text: $draft)
                                 .focused($focus, equals: .person)
                                 .submitLabel(.done)
-                                .onSubmit { commit(); focus = .person }
+                                // Adding someone puts the keyboard away so the new chip is in view;
+                                // tapping the field again brings it back for the next name.
+                                .onSubmit { commit(); focus = nil }
                                 .textInputAutocapitalization(.words)
                                 // Commas are split on return, Add or Create rather than on every
                                 // keystroke: rewriting the field mid-typing drops characters.
                             if !draft.isEmpty {
-                                Button(t("Add")) { commit() }.font(.system(size: 15, weight: .semibold))
+                                Button(t("Add")) { commit(); focus = nil }.font(.system(size: 15, weight: .semibold))
                             }
                         }
                         .fieldStyle()

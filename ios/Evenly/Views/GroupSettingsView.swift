@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct GroupSettingsView: View {
+    @FocusState private var addingFocused: Bool
     let store: GroupStore
     let group: GroupSnapshot
     let me: String?
@@ -58,6 +59,7 @@ struct GroupSettingsView: View {
                     }
                     HStack {
                         TextField(t("Add someone"), text: $newPerson)
+                            .focused($addingFocused)
                             .textInputAutocapitalization(.words)
                             .onSubmit(addPerson)
                         Button(t("Add"), action: addPerson).disabled(newPerson.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -111,6 +113,8 @@ struct GroupSettingsView: View {
     private func addPerson() {
         let n = newPerson.trimmingCharacters(in: .whitespaces)
         guard !n.isEmpty else { return }
+        // Same as New group: the keyboard goes away after each add and comes back on tap.
+        addingFocused = false
         run {
             try await store.addMember(n)
             newPerson = ""

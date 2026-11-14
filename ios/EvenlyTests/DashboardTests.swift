@@ -16,7 +16,7 @@ final class DashboardTests: XCTestCase {
         return GroupSnapshot(id: id, name: id.capitalized, currency: currency, digits: Money.digits(for: currency),
                              createdAt: "", updatedAt: "", revision: 1, members: ms, entries: es, balances: bs, transfers: [],
                              stats: Stats(totalSpent: es.filter { !$0.isTransfer }.reduce(0) { $0 + $1.amount },
-                                          expenseCount: es.count, byCategory: [:], settled: false))
+                                          expenseCount: es.count, byCategory: [:], settled: balances.allSatisfy { $0 == 0 }))
     }
 
     func testBalancesAddUpAcrossGroupsInTheSameCurrency() {
@@ -138,5 +138,17 @@ final class DashboardTests: XCTestCase {
         let rect = CGRect(x: 0, y: 0, width: 300, height: 400)
         XCTAssertEqual(AppearanceController.coveringRadius(from: .zero, in: rect), 500, accuracy: 0.001)
         XCTAssertEqual(AppearanceController.coveringRadius(from: CGPoint(x: 150, y: 200), in: rect), 250, accuracy: 0.001)
+    }
+
+    func testUnsettledGroupsWithoutYouAreReportedNotSilentlyDropped() {
+        let known = group("a", members: ["Me", "Ana"], balances: [500, -500], entries: [])
+        let unknownOwing = group("b", members: ["Me", "Ben"], balances: [-226, 226], entries: [])
+        let unknownSettled = group("c", members: ["X", "Y"], balances: [0, 0], entries: [])
+        let d = Dashboard.build(groups: [known, unknownOwing, unknownSettled],
+                                me: { $0.id == "a" ? $0.members[0].id : nil }, now: now)
+        XCTAssertEqual(d.primary?.net, 500, "only the group that knows you is in the totals")
+        XCTAssertEqual(d.uncountedGroups, 1, "the unsettled group without you is reported")
+        XCTAssertNil(d.groups[2].yourNet)
+        XCTAssertTrue(d.groups[2].group.stats.settled, "a group settled for everyone can still say so")
     }
 }
