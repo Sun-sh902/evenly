@@ -30,16 +30,17 @@ struct HomeView: View {
         NavigationStack(path: $app.path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    header
                     if cards.isEmpty && !app.homeLoaded {
                         // First load still running (a few milliseconds): show nothing rather than the intro.
                         Color.clear.frame(height: 1)
                     } else if cards.isEmpty {
                         EmptyHome(isLocal: app.isLocal)
-                            .padding(.top, 28)
+                            .padding(.top, 8)
                     } else {
+                        // No logo or app name up here: people know which app they're in (Apple's
+                        // branding guidance). The balance itself is the header, as in Weather.
                         BalanceSummary(dashboard: d)
-                            .padding(.top, 30)
+                            .padding(.top, 4)
                         groupsHeader(count: cards.count)
                             .padding(.top, 34)
                             .padding(.bottom, 14)
@@ -67,14 +68,17 @@ struct HomeView: View {
                     .allowsHitTesting(false)
             }
             .overlay(alignment: .bottom) { floatingBar }
-            .overlay(alignment: .top) {
-                // Content fades under the status bar instead of hitting a hard edge.
-                LinearGradient(colors: [Color.paper, Color.paper.opacity(0)], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 56)
-                    .ignoresSafeArea(edges: .top)
-                    .allowsHitTesting(false)
+            // A system bar with no title: it carries only the settings control (Liquid Glass
+            // on iOS 26) and gives the content a proper scroll-edge fade under the status bar.
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showServer = true } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel(t("Settings"))
+                }
             }
-            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { GroupScreen(groupId: $0) }
             .sheet(isPresented: $showCreate) { CreateGroupView() }
             .sheet(isPresented: $showJoin) { JoinGroupView() }
@@ -132,26 +136,7 @@ struct HomeView: View {
         return app.groupList.map(WalletItem.init)
     }
 
-    // MARK: Header
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            BrandMark(size: 22)
-            Text("Evenly").font(.system(size: 17, weight: .semibold)).tracking(-0.3)
-            Spacer()
-            Button { showServer = true } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.ink)
-                    .frame(width: 40, height: 40)
-                    .background(Color.surface, in: Circle())
-                    .overlay(Circle().strokeBorder(Color.line))
-            }
-            .buttonStyle(PressScaleStyle(scale: 0.92))
-            .accessibilityLabel(t("Settings"))
-        }
-        .padding(.top, 4)
-    }
+    // MARK: Groups header
 
     private func groupsHeader(count: Int) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {

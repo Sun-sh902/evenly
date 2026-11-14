@@ -18,6 +18,11 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Evenly connects to the Evenly server you host on your local network.</string>
 </dict>
