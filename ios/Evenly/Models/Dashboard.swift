@@ -37,6 +37,10 @@ struct Dashboard: Equatable {
     var recent: [Activity]
     /// True when at least one group knows which member you are.
     var knowsYou: Bool
+    /// Groups that still have money to settle but don't know which member you are.
+    /// Their balances can't be in the totals, so the home screen says so instead of
+    /// quietly showing a smaller number.
+    var uncountedGroups = 0
 
     var primary: Totals? { totals.first }
 
@@ -50,6 +54,7 @@ struct Dashboard: Equatable {
         var summaries: [GroupSummary] = []
         var activity: [Activity] = []
         var knowsYou = false
+        var uncounted = 0
 
         // Entry dates are "YYYY-MM-DD", so the month is just the first seven characters.
         // Comparing those strings is far cheaper than parsing every date.
@@ -67,6 +72,7 @@ struct Dashboard: Equatable {
             var t = byCurrency[g.currency] ?? Totals(currency: g.currency, digits: g.digits, monthly: Array(repeating: 0, count: monthsShown))
             groupCount[g.currency, default: 0] += 1
             let mine = me(g)
+            if mine == nil && !g.stats.settled { uncounted += 1 }
             if let mine {
                 knowsYou = true
                 let net = g.net(of: mine)
@@ -94,6 +100,7 @@ struct Dashboard: Equatable {
         let recent = activity.sorted {
             $0.entry.date != $1.entry.date ? $0.entry.date > $1.entry.date : $0.entry.createdAt > $1.entry.createdAt
         }
-        return Dashboard(totals: totals, groups: summaries, recent: Array(recent.prefix(recentCount)), knowsYou: knowsYou)
+        return Dashboard(totals: totals, groups: summaries, recent: Array(recent.prefix(recentCount)), knowsYou: knowsYou,
+                         uncountedGroups: uncounted)
     }
 }

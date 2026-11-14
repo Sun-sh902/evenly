@@ -8,7 +8,6 @@ struct HomeView: View {
     @State private var showCreate = false
     @State private var showJoin = false
     @State private var showServer = false
-    @State private var serverOK: Bool?
     /// Which card is open. Kept in its own object so that opening a card redraws only the
     /// stack, not the whole home screen (balance, header, every digit) on the tap's frame.
     @State private var selection = WalletSelection()
@@ -52,7 +51,6 @@ struct HomeView: View {
                                 .contextMenu { menu(for: item) }
                         }
                     }
-                    storageFooter.padding(.top, 28)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 6)
@@ -154,28 +152,7 @@ struct HomeView: View {
         .accessibilityAddTraits(.isHeader)
     }
 
-    // MARK: Footer and floating actions
-
-    private var storageFooter: some View {
-        Button { showServer = true } label: {
-            HStack(spacing: 7) {
-                if app.isLocal {
-                    Image(systemName: "lock.iphone").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.pos)
-                    Text(t("Stored on this iPhone · works offline"))
-                } else {
-                    Circle()
-                        .fill(serverOK == nil ? Color.ink3 : serverOK == true ? Color.pos : Color.neg)
-                        .frame(width: 7, height: 7)
-                    Text(serverOK == false ? t("Can't reach %@", app.serverURL?.host ?? t("server")) : t("Server: %@", app.serverURL?.host ?? t("not set")))
-                }
-            }
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(Color.ink3)
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint(t("Opens settings"))
-    }
+    // MARK: Floating action
 
     private var floatingBar: some View {
         Button { showCreate = true } label: {
@@ -191,9 +168,8 @@ struct HomeView: View {
     private func refresh() async {
         await app.refreshHome()
         guard !app.isLocal else { await app.refreshMeta(); return }
-        serverOK = nil
-        serverOK = (try? await app.client?.health()) ?? false
-        if serverOK == true { await app.refreshMeta() }
+        // Only fetch server metadata when the server answers; a failed health check is silent here.
+        if (try? await app.client?.health()) == true { await app.refreshMeta() }
     }
 }
 
@@ -268,8 +244,29 @@ private struct BalanceSummary: View {
                 .foregroundStyle(Color.ink3)
                 .lineLimit(2)
             }
+
+            // Without any identity the header already asks you to choose one; say it once.
+            if dashboard.knowsYou { uncountedNote }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// Shown under the totals when some unsettled groups don't know who you are yet,
+    /// so a missing balance is never mistaken for a wrong one.
+    @ViewBuilder
+    private var uncountedNote: some View {
+        if dashboard.uncountedGroups > 0 {
+            HStack(spacing: 6) {
+                Image(systemName: "person.crop.circle.badge.questionmark").font(.system(size: 12, weight: .semibold))
+                Text(tCount(dashboard.uncountedGroups,
+                            one: "%@ group isn't counted yet: open it and choose who you are.",
+                            other: "%@ groups aren't counted yet: open them and choose who you are."))
+            }
+            .font(.system(size: 13))
+            .foregroundStyle(Color.ink3)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 2)
+        }
     }
 
     private func figure(_ title: String, _ value: String, dot: Color) -> some View {
@@ -300,6 +297,8 @@ struct WalletItem: Identifiable, Equatable {
     let spend: Int
     /// Your net in this group; nil when you haven't said who you are or it isn't loaded.
     let net: Int?
+    /// Everyone in the group is at zero, so it's settled whoever you are.
+    let settled: Bool
     let snapshot: GroupSnapshot?
 
     init(_ s: Dashboard.GroupSummary) {
@@ -310,6 +309,7 @@ struct WalletItem: Identifiable, Equatable {
         digits = s.group.digits
         spend = s.group.stats.totalSpent
         net = s.yourNet
+        settled = s.group.stats.settled
         snapshot = s.group
     }
 
@@ -321,6 +321,7 @@ struct WalletItem: Identifiable, Equatable {
         digits = r.digits
         spend = r.total
         net = nil
+        settled = false
         snapshot = nil
     }
 
@@ -561,14 +562,24 @@ private struct WalletCard: View {
 
     @ViewBuilder
     private var status: some View {
-        if let net = item.net {
-            if net == 0 {
-                HStack(spacing: 5) {
-                    Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
-                    Text(t("Settled")).font(.system(size: 13, weight: .semibold))
+        if item.net == nil && item.settled {
+            // Settled for everyone, so it's settled for you too: no need to know who you are.
+            settledLabel
+        } else if item.net == nil && item.snapshot != nil {
+            // Money is still owed in this group, but we don't know which member you are.
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(t("Not counted"))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.48))
+                HStack(spacing: 4) {
+                    Image(systemName: "person.crop.circle.badge.questionmark").font(.system(size: 13, weight: .semibold))
+                    Text(t("Which one are you?")).font(.system(size: 14, weight: .semibold))
                 }
-                .foregroundStyle(.white.opacity(0.55))
-                .padding(.top, 2)
+                .foregroundStyle(.white.opacity(0.8))
+            }
+        } else if let net = item.net {
+            if net == 0 {
+                settledLabel
             } else {
                 VStack(alignment: .trailing, spacing: 3) {
                     Text(net > 0 ? t("To receive") : t("To pay"))
@@ -583,6 +594,15 @@ private struct WalletCard: View {
                 }
             }
         }
+    }
+
+    private var settledLabel: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
+            Text(t("Settled")).font(.system(size: 13, weight: .semibold))
+        }
+        .foregroundStyle(.white.opacity(0.55))
+        .padding(.top, 2)
     }
 
     private var actions: some View {
