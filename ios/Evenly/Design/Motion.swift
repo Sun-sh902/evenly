@@ -47,6 +47,14 @@ struct RollingNumber: View {
         return chars.enumerated().map { Cell(id: chars.count - 1 - $0.offset, char: $0.element) }
     }
 
+    /// How far to pull the number left so its ink lines up with text above it. Only a
+    /// leading sign carries noticeable side bearing in the serif (~5.4% of the size);
+    /// currency symbols such as "¥" and "$" already sit on the edge.
+    static func opticalInset(for text: String, size: CGFloat) -> CGFloat {
+        guard let first = text.first, "+-−".contains(first) else { return 0 }
+        return size * 0.054
+    }
+
     /// Shrinks long amounts so they stay on one line without truncating.
     static func fittedSize(for text: String, base: CGFloat = 56, comfortable: Int = 10, minimum: CGFloat = 32) -> CGFloat {
         guard text.count > comfortable else { return base }

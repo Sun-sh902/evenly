@@ -151,4 +151,11 @@ final class DashboardTests: XCTestCase {
         XCTAssertNil(d.groups[2].yourNet)
         XCTAssertTrue(d.groups[2].group.stats.settled, "a group settled for everyone can still say so")
     }
+
+    func testOnlyALeadingSignIsPulledLeft() {
+        XCTAssertEqual(RollingNumber.opticalInset(for: "+¥3,114.47", size: 100), 5.4, accuracy: 0.001)
+        XCTAssertEqual(RollingNumber.opticalInset(for: "-$12.00", size: 100), 5.4, accuracy: 0.001)
+        XCTAssertEqual(RollingNumber.opticalInset(for: "¥0.00", size: 100), 0)
+        XCTAssertEqual(RollingNumber.opticalInset(for: "", size: 100), 0)
+    }
 }

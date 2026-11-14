@@ -34,8 +34,14 @@ struct HomeView: View {
                         // First load still running (a few milliseconds): show nothing rather than the intro.
                         Color.clear.frame(height: 1)
                     } else if cards.isEmpty {
-                        EmptyHome(isLocal: app.isLocal)
-                            .padding(.top, 8)
+                        // No groups yet: the same screen with nothing in it, not a landing page.
+                        // The front ghost card is where the first real card will land.
+                        EmptyBalance()
+                            .padding(.top, 4)
+                        groupsHeader(count: 0)
+                            .padding(.top, 34)
+                            .padding(.bottom, 14)
+                        GhostWallet { showCreate = true }
                     } else {
                         // No logo or app name up here: people know which app they're in (Apple's
                         // branding guidance). The balance itself is the header, as in Weather.
@@ -68,7 +74,11 @@ struct HomeView: View {
                     .ignoresSafeArea(edges: .bottom)
                     .allowsHitTesting(false)
             }
-            .overlay(alignment: .bottom) { floatingBar }
+            .overlay(alignment: .bottom) {
+                // With no groups the front ghost card is the one way in; two buttons for the
+                // same action would compete.
+                if !cards.isEmpty { floatingBar }
+            }
             // A system bar with no title: it carries only the settings control (Liquid Glass
             // on iOS 26) and gives the content a proper scroll-edge fade under the status bar.
             .navigationBarTitleDisplayMode(.inline)
@@ -226,9 +236,9 @@ private struct BalanceSummary: View {
                 // label sits closer to it than the figures below do (it labels the number).
                 .padding(.top, -14)
                 .padding(.bottom, -6)
-                // Optical alignment: the serif's first glyph has ~5% side bearing, which left
-                // the number's ink 3pt right of the label above it.
-                .offset(x: -size * 0.054)
+                // Optical alignment: a leading "+" or "−" has side bearing that left the
+                // number's ink 3pt right of the label above it.
+                .offset(x: -RollingNumber.opticalInset(for: headline, size: size))
                 .blur(radius: reduceMotion ? 0 : (1 - focus) * 12)
                 .opacity(0.15 + 0.85 * focus)
                 .onAppear {
@@ -682,55 +692,78 @@ private struct InkAvatarStack: View {
 
 // MARK: - Empty state
 
-/// No groups yet: the pitch in type, then the three steps on ink tiles.
-private struct EmptyHome: View {
-    let isLocal: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(t("Split the bill,")).foregroundStyle(Color.ink)
-                Text(t("not the friendship.")).foregroundStyle(Color.ink3)
-            }
-            .font(.display(40))
-            .tracking(-0.8)
-            .minimumScaleFactor(0.7)
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
-
-            Text(isLocal
-                 ? t("Track shared costs for trips, flats and dinners. No sign-up, no limits, and everything stays on this iPhone, even offline.")
-                 : t("Track shared costs for trips, flats and dinners. Nobody signs up and nobody hits a limit. Share one link and the whole group is in."))
-                .font(.system(size: 15))
-                .foregroundStyle(Color.ink2)
-                .fixedSize(horizontal: false, vertical: true)
-
-            VStack(spacing: 8) {
-                step(0, "person.2", t("Make a group"), t("Name it, add the people. That's the whole setup."))
-                step(1, "square.split.2x1", t("Log what you spend"), t("Split equally, by exact amounts, by shares or by percent. Pennies always add up."))
-                step(2, "arrow.left.arrow.right", t("Settle in fewer moves"), t("Evenly works out the smallest set of payments so everyone ends at zero."))
-            }
-            .padding(.top, 14)
-        }
+/// The balance header before there is anything to add up: same label, same serif, muted.
+private struct EmptyBalance: View {
+    private var zero: String {
+        let code = Locale.current.currency?.identifier ?? "USD"
+        let currency = Money.currencyCodes.contains(code) ? code : "USD"
+        return Money.format(0, currency: currency, digits: Money.digits(for: currency))
     }
 
-    private func step(_ i: Int, _ symbol: String, _ title: String, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: symbol)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 34, height: 34)
-                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.system(size: 16, weight: .semibold)).tracking(-0.2).foregroundStyle(.white)
-                Text(text).font(.system(size: 13)).foregroundStyle(.white.opacity(0.58)).fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-            Text("0\(i + 1)").font(.system(size: 12, weight: .semibold)).monospacedDigit().foregroundStyle(.white.opacity(0.35))
+    var body: some View {
+        let size = RollingNumber.fittedSize(for: zero)
+        VStack(alignment: .leading, spacing: 10) {
+            Text(t("Net balance"))
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.ink3)
+                .zIndex(1)
+            RollingNumber(text: zero, size: size, tracking: -1.2)
+                .foregroundStyle(Color.ink3.opacity(0.55))
+                .padding(.top, -14)
+                .padding(.bottom, -6)
+                .offset(x: -RollingNumber.opticalInset(for: zero, size: size))
         }
-        .padding(16)
-        .background(WalletTone.at(i), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Three dashed cards where the wallet will be. The front one creates the first group.
+private struct GhostWallet: View {
+    let onCreate: () -> Void
+
+    private let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
+    private let dash = StrokeStyle(lineWidth: 1.5, dash: [7, 6])
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            // The cards behind are quiet tonal steps, like the real stack; only the front one
+            // is dashed, so outlines don't cross in the corners.
+            shape.fill(Color.ink.opacity(0.05))
+                .frame(height: 70)
+                .padding(.horizontal, 14)
+            shape.fill(Color.ink.opacity(0.08))
+                .frame(height: 70)
+                .padding(.horizontal, 7)
+                .offset(y: 22)
+            Button(action: onCreate) {
+                VStack(spacing: 10) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.paper)
+                        .frame(width: 48, height: 48)
+                        .background(Color.ink, in: Circle())
+                    VStack(spacing: 4) {
+                        Text(t("Create your first group"))
+                            .font(.system(size: 17, weight: .semibold))
+                            .tracking(-0.3)
+                            .foregroundStyle(Color.ink)
+                        Text(t("Trips, shared flats, dinners"))
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.ink3)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 176)
+                .background(Color.paper, in: shape)
+                .overlay(shape.strokeBorder(Color.ink3.opacity(0.6), style: dash))
+                .contentShape(shape)
+            }
+            .buttonStyle(PressScaleStyle(scale: 0.98))
+            .offset(y: 44)
+        }
+        .frame(height: 44 + 176, alignment: .top)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 

@@ -35,6 +35,8 @@ enum Translations {
         "Tap to open": "轻点展开",
         "Tap to close": "轻点收起",
         "Not counted": "未计入",
+        "Create your first group": "新建第一个群组",
+        "Trips, shared flats, dinners": "旅行、合租、聚餐",
         "%@ group isn't counted yet: open it and choose who you are.": "有 %@ 个群组还没计入：打开它，选好你是哪一位。",
         "%@ groups aren't counted yet: open them and choose who you are.": "有 %@ 个群组还没计入：打开它们，选好你是哪一位。",
         "Appearance": "外观",
