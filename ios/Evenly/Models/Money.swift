@@ -123,10 +123,24 @@ enum Day {
         if iso == string(from: now) { return t("Today") }
         if let y = Calendar.current.date(byAdding: .day, value: -1, to: now), iso == string(from: y) { return t("Yesterday") }
         guard let d = date(from: iso) else { return iso }
-        let f = DateFormatter()
-        f.locale = Localizer.shared.locale
         let sameYear = Calendar.current.component(.year, from: d) == Calendar.current.component(.year, from: now)
-        f.setLocalizedDateFormatFromTemplate(sameYear ? "EEE MMM d" : "EEE MMM d yyyy")
-        return f.string(from: d)
+        return labelFormatter(template: sameYear ? "EEE MMM d" : "EEE MMM d yyyy").string(from: d)
+    }
+
+    /// Creating a DateFormatter costs far more than using one, so keep one per locale and template.
+    private nonisolated(unsafe) static var labelFormatters: [String: DateFormatter] = [:]
+    private static let labelLock = NSLock()
+
+    private static func labelFormatter(template: String) -> DateFormatter {
+        let locale = Localizer.shared.locale
+        let key = "\(locale.identifier)|\(TimeZone.current.identifier)|\(template)"
+        labelLock.lock()
+        defer { labelLock.unlock() }
+        if let f = labelFormatters[key] { return f }
+        let f = DateFormatter()
+        f.locale = locale
+        f.setLocalizedDateFormatFromTemplate(template)
+        labelFormatters[key] = f
+        return f
     }
 }

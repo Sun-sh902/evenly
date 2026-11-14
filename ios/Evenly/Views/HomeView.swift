@@ -9,14 +9,13 @@ struct HomeView: View {
     @State private var showJoin = false
     @State private var showServer = false
     @State private var serverOK: Bool?
-    @State private var expanded: String?
+    /// Which card is open. Kept in its own object so that opening a card redraws only the
+    /// stack, not the whole home screen (balance, header, every digit) on the tap's frame.
+    @State private var selection = WalletSelection()
     @State private var adding: AddTarget?
     @State private var savedTick = 0
 
-    private var dashboard: Dashboard {
-        _ = app.meVersion // re-render when "which one are you" changes
-        return Dashboard.build(groups: app.dashboardGroups, me: { app.me(in: $0) })
-    }
+    private var dashboard: Dashboard { app.dashboard() }
 
     /// One spring for the whole stack: critically damped, so it settles without wobble
     /// and picks up from wherever it is if tapped again mid-flight.
@@ -32,7 +31,10 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header
-                    if cards.isEmpty {
+                    if cards.isEmpty && !app.homeLoaded {
+                        // First load still running (a few milliseconds): show nothing rather than the intro.
+                        Color.clear.frame(height: 1)
+                    } else if cards.isEmpty {
                         EmptyHome(isLocal: app.isLocal)
                             .padding(.top, 28)
                     } else {
@@ -41,14 +43,13 @@ struct HomeView: View {
                         groupsHeader(count: cards.count)
                             .padding(.top, 34)
                             .padding(.bottom, 14)
-                        WalletStack(items: cards, expanded: expanded) { item, index, isOpen, recede in
+                        WalletStack(items: cards, selection: selection) { item, index, isOpen, recede in
                             WalletCard(item: item, tone: WalletTone.at(index), isOpen: isOpen, recede: recede,
                                        onTap: { toggle(item.id) },
                                        onAdd: { add(item) },
                                        onOpen: { app.path = [item.id] })
                                 .contextMenu { menu(for: item) }
                         }
-                        .animation(stackAnimation, value: expanded)
                     }
                     storageFooter.padding(.top, 28)
                 }
@@ -88,18 +89,23 @@ struct HomeView: View {
             .task(id: "\(app.mode.rawValue)|\(app.serverAddress)") { await refresh() }
             .onChange(of: app.path) { _, path in if path.isEmpty { Task { await app.refreshHome() } } }
             .onChange(of: cards.map(\.id)) { _, ids in
-                if let e = expanded, !ids.contains(e) { expanded = nil }
+                if let e = selection.expanded, !ids.contains(e) { selection.expanded = nil }
             }
             .refreshable { await refresh() }
             .toast($app.pendingNotice)
-            .sensoryFeedback(.selection, trigger: expanded)
             .sensoryFeedback(.success, trigger: savedTick)
         }
         .tint(.ink)
     }
 
     private func toggle(_ id: String) {
-        expanded = expanded == id ? nil : id
+        // The generator was woken on touch-down, so this costs nothing on the tap's frame.
+        Haptics.selection()
+        // An explicit transaction animates everything the change moves, including the
+        // footer below the stack (a value-scoped .animation only covered the stack itself).
+        withAnimation(stackAnimation) {
+            selection.expanded = selection.expanded == id ? nil : id
+        }
     }
 
     private func add(_ item: WalletItem) {
@@ -383,18 +389,30 @@ enum WalletTone {
     }
 }
 
+@MainActor
+@Observable
+final class WalletSelection {
+    var expanded: String?
+}
+
 private struct WalletStack<Card: View>: View {
     let items: [WalletItem]
-    let expanded: String?
+    let selection: WalletSelection
     let card: (WalletItem, Int, Bool, Double) -> Card
 
     var body: some View {
-        let open = items.firstIndex { $0.id == expanded }
+        let open = items.firstIndex { $0.id == selection.expanded }
         let layout = WalletLayout.frames(count: items.count, open: open)
         ZStack(alignment: .top) {
             ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
                 let f = layout.frames[i]
                 card(item, i, i == open, WalletLayout.recede(index: i, open: open))
+                    .environment(\.walletCardPlacement, .init(
+                        // Shade falls on a card directly behind, not on the page or into the gap below an open card.
+                        shadeAbove: i > 0 && i - 1 != open,
+                        // Blurred shadows are re-rendered off-screen every frame they move, so only
+                        // the bottom card casts one (it frames the stack on the page).
+                        castsShadow: i == items.count - 1))
                     .frame(height: f.height)
                     .offset(y: f.y)
                     .zIndex(Double(i))
@@ -404,6 +422,22 @@ private struct WalletStack<Card: View>: View {
         .frame(maxWidth: .infinity, minHeight: layout.total, maxHeight: layout.total, alignment: .top)
         .onAppear { DeviceTilt.shared.start() }
         .onDisappear { DeviceTilt.shared.stop() }
+    }
+}
+
+struct WalletCardPlacement: Equatable {
+    var shadeAbove = false
+    var castsShadow = false
+}
+
+private struct WalletCardPlacementKey: EnvironmentKey {
+    static let defaultValue = WalletCardPlacement()
+}
+
+extension EnvironmentValues {
+    var walletCardPlacement: WalletCardPlacement {
+        get { self[WalletCardPlacementKey.self] }
+        set { self[WalletCardPlacementKey.self] = newValue }
     }
 }
 
@@ -418,25 +452,50 @@ private struct WalletCard: View {
     let onOpen: () -> Void
 
     @State private var pressed = false
+    @Environment(\.walletCardPlacement) private var placement
 
     private static let mint = Color(hex: 0xA9DFC3)
     private static let coral = Color(hex: 0xF1B19D)
-    private let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
 
     var body: some View {
         // The card's size comes from the stack; the content hangs from the top and is
         // clipped, so opening reveals the actions like pulling a card out of a sleeve.
+        // Everything here is chosen to stay on the GPU's fast path while cards move:
+        // plain rounded-corner clipping, no masks, no blend modes, no per-card blur.
+        let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
         tone
             .overlay { CardSheen() }
             .overlay(alignment: .top) { content }
             .overlay { Color.black.opacity(0.34 * recede).allowsHitTesting(false) }
+            .overlay(alignment: .top) {
+                // A hairline catching light along the top edge and corners, which separates
+                // each card from the one behind. It is drawn at a fixed size (so it never
+                // redraws while the card resizes) and cut with a plain rectangle where the
+                // corners end; the card's clip keeps the inner half of the 2pt stroke.
+                shape.stroke(Color.white.opacity(0.13), lineWidth: 2)
+                    .frame(height: WalletLayout.collapsedHeight)
+                    .frame(height: 26, alignment: .top)
+                    .clipped()
+                    .allowsHitTesting(false)
+            }
             .clipShape(shape)
-            .overlay(
-                // A hairline catching light on the top edge separates each card from the one behind.
-                shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.03), .clear],
-                                                  startPoint: .top, endPoint: .bottom), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.16), radius: 14, y: -3)
+            .background(alignment: .top) {
+                // A soft band of shade on the card behind, just above this card's edge:
+                // reads as a shadow without a blur pass.
+                if placement.shadeAbove {
+                    LinearGradient(colors: [.black.opacity(0), .black.opacity(0.2)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 14)
+                        // Inset so it stays on the card behind even when that card shrinks back 4%.
+                        .padding(.horizontal, 10)
+                        .offset(y: -14)
+                        .allowsHitTesting(false)
+                }
+            }
+            .background {
+                if placement.castsShadow {
+                    shape.fill(tone).shadow(color: .black.opacity(0.16), radius: 14, y: 6)
+                }
+            }
             .scaleEffect(1 - 0.04 * recede, anchor: .top)
             .scaleEffect(pressed ? 0.98 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 1), value: pressed)
@@ -446,7 +505,12 @@ private struct WalletCard: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: onTap) { summary }
-                .buttonStyle(PressReporter { pressed = $0 })
+                .buttonStyle(PressReporter { down in
+                    pressed = down
+                    // Wake the haptic engine as the finger lands, so the tick on release is
+                    // instant. Started cold, it blocked the first frames of the animation.
+                    if down { Haptics.prepareSelection() }
+                })
                 .accessibilityHint(isOpen ? t("Tap to close") : t("Tap to open"))
             actions
                 .padding(.horizontal, 18)
