@@ -18,13 +18,13 @@ struct CreateGroupView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Start a group").font(.display(34)).tracking(-0.6)
-                        Text("Takes ten seconds. You can add more people later.").font(.system(size: 15)).foregroundStyle(Color.ink3)
+                        Text(t("Start a group")).font(.display(34)).tracking(-0.6)
+                        Text(t("Takes ten seconds. You can add more people later.")).font(.system(size: 15)).foregroundStyle(Color.ink3)
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Group name").font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
-                        TextField("Lisbon trip", text: $name)
+                        Text(t("Group name")).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
+                        TextField(t("Lisbon trip"), text: $name)
                             .focused($focus, equals: .name)
                             .submitLabel(.next)
                             .onSubmit { focus = .person }
@@ -32,8 +32,8 @@ struct CreateGroupView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Currency").font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
-                        Picker("Currency", selection: $currency) {
+                        Text(t("Currency")).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
+                        Picker(t("Currency"), selection: $currency) {
                             ForEach(Money.currencyCodes, id: \.self) { Text("\($0)  \(Money.symbol(for: $0).trimmingCharacters(in: .whitespaces))").tag($0) }
                         }
                         .pickerStyle(.menu)
@@ -42,7 +42,7 @@ struct CreateGroupView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("People").font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
+                        Text(t("People")).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
                         if !people.isEmpty {
                             FlowLayout(spacing: 8) {
                                 ForEach(Array(people.enumerated()), id: \.element) { i, person in
@@ -53,7 +53,7 @@ struct CreateGroupView: View {
                                             Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.ink3)
                                                 .frame(width: 22, height: 22)
                                         }
-                                        .accessibilityLabel("Remove \(person)")
+                                        .accessibilityLabel(t("Remove %@", person))
                                     }
                                     .padding(.leading, 4).padding(.trailing, 6).frame(height: 34)
                                     .background(Color.surface, in: Capsule())
@@ -63,7 +63,7 @@ struct CreateGroupView: View {
                             }
                         }
                         HStack {
-                            TextField(people.isEmpty ? "Type a name, then return" : "Add another", text: $draft)
+                            TextField(people.isEmpty ? t("Type a name, then return") : t("Add another"), text: $draft)
                                 .focused($focus, equals: .person)
                                 .submitLabel(.done)
                                 .onSubmit { commit(); focus = .person }
@@ -71,11 +71,11 @@ struct CreateGroupView: View {
                                 // Commas are split on return, Add or Create rather than on every
                                 // keystroke: rewriting the field mid-typing drops characters.
                             if !draft.isEmpty {
-                                Button("Add") { commit() }.font(.system(size: 15, weight: .semibold))
+                                Button(t("Add")) { commit() }.font(.system(size: 15, weight: .semibold))
                             }
                         }
                         .fieldStyle()
-                        Text("Add yourself too. Separate names with return or a comma.").font(.system(size: 13)).foregroundStyle(Color.ink3)
+                        Text(t("Add yourself too. Separate names with return or a comma.")).font(.system(size: 13)).foregroundStyle(Color.ink3)
                     }
 
                     if let error {
@@ -85,7 +85,7 @@ struct CreateGroupView: View {
                     Button(action: create) {
                         HStack {
                             if saving { ProgressView().tint(Color.paper) }
-                            Text("Create group")
+                            Text(t("Create group"))
                             Image(systemName: "arrow.right")
                         }
                         .frame(maxWidth: .infinity)
@@ -98,7 +98,7 @@ struct CreateGroupView: View {
             .scrollDismissesKeyboard(.interactively)
             .background(Color.paper.ignoresSafeArea())
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(t("Cancel")) { dismiss() } }
             }
             .onAppear {
                 if !Money.currencyCodes.contains(currency) { currency = "USD" }
@@ -120,15 +120,15 @@ struct CreateGroupView: View {
             }
         }
         draft = ""
-        error = dupes.isEmpty ? nil : "\(dupes.joined(separator: ", ")) \(dupes.count > 1 ? "are" : "is") already on the list."
+        error = dupes.isEmpty ? nil : (dupes.count > 1 ? t("%@ are already on the list.", dupes.joined(separator: ", ")) : t("%@ is already on the list.", dupes[0]))
     }
 
     private func create() {
         commit()
         let trimmed = name.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { error = "Give your group a name."; focus = .name; return }
-        guard !people.isEmpty else { error = "Add at least one person."; focus = .person; return }
-        guard let backend = app.backend else { error = "Set a server address first."; return }
+        guard !trimmed.isEmpty else { error = t("Give your group a name."); focus = .name; return }
+        guard !people.isEmpty else { error = t("Add at least one person."); focus = .person; return }
+        guard let backend = app.backend else { error = t("Set a server address first."); return }
         saving = true
         Task {
             defer { saving = false }

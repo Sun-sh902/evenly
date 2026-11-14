@@ -9,7 +9,7 @@ enum StorageMode: String, CaseIterable, Identifiable {
     case server
 
     var id: String { rawValue }
-    var label: String { self == .device ? "This iPhone" : "Evenly server" }
+    var label: String { self == .device ? t("This iPhone") : t("Evenly server") }
 }
 
 /// App wide state: storage mode, server address, the group list, and
@@ -37,6 +37,8 @@ final class AppState {
     private(set) var recents: [RecentGroup] = []
     /// Groups stored on this iPhone.
     private(set) var localGroups: [GroupSnapshot] = []
+    /// Latest snapshots of the server groups in `recents`, for the home dashboard.
+    private(set) var serverGroups: [GroupSnapshot] = []
     var path: [String] = []
     var pendingNotice: String?
     var categories: [String] = LocalBackend.categories
@@ -109,6 +111,28 @@ final class AppState {
         localGroups = (try? await local.listGroups()) ?? []
     }
 
+    /// Groups with full data for the home dashboard in the current mode.
+    var dashboardGroups: [GroupSnapshot] { isLocal ? localGroups : serverGroups }
+
+    /// Reloads whatever the home screen needs for the current mode.
+    func refreshHome() async {
+        if isLocal {
+            await refreshLocalGroups()
+            return
+        }
+        guard let client else { serverGroups = []; return }
+        let ids = recents.map(\.id)
+        var fetched: [String: GroupSnapshot] = [:]
+        await withTaskGroup(of: (String, GroupSnapshot?).self) { tasks in
+            for id in ids {
+                tasks.addTask { (id, try? await client.group(id)) }
+            }
+            for await (id, g) in tasks { if let g { fetched[id] = g } }
+        }
+        // Keep the "most recently opened first" order; unreachable groups are simply left out.
+        serverGroups = ids.compactMap { fetched[$0] }
+    }
+
     func remember(_ g: GroupSnapshot) {
         if mode == .device {
             localGroups.removeAll { $0.id == g.id }
@@ -121,6 +145,8 @@ final class AppState {
         )
         recents.removeAll { $0.id == g.id }
         recents.insert(item, at: 0)
+        serverGroups.removeAll { $0.id == g.id }
+        serverGroups.insert(g, at: 0)
         if recents.count > 20 { recents = Array(recents.prefix(20)) }
         saveRecents()
     }
@@ -128,6 +154,7 @@ final class AppState {
     func forget(_ id: String) {
         recents.removeAll { $0.id == id }
         localGroups.removeAll { $0.id == id }
+        serverGroups.removeAll { $0.id == id }
         defaults.removeObject(forKey: Keys.me(id))
         defaults.removeObject(forKey: Keys.lastPayer(id))
         saveRecents()
@@ -192,11 +219,11 @@ final class AppState {
     func open(_ parsed: InviteLink.Parsed) {
         if mode != .server {
             mode = .server
-            pendingNotice = "Switched to server mode to open a shared group"
+            pendingNotice = t("Switched to server mode to open a shared group")
         }
         if let server = parsed.server, Self.normalize(server.absoluteString) != serverURL {
             serverAddress = server.absoluteString
-            pendingNotice = "Connected to \(server.host ?? server.absoluteString)"
+            pendingNotice = t("Connected to %@", server.host ?? server.absoluteString)
         }
         path = [parsed.groupId]
     }

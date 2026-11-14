@@ -120,11 +120,11 @@ enum Day {
     static var today: String { string(from: Date()) }
 
     static func label(_ iso: String, now: Date = Date()) -> String {
-        if iso == string(from: now) { return "Today" }
-        if let y = Calendar.current.date(byAdding: .day, value: -1, to: now), iso == string(from: y) { return "Yesterday" }
+        if iso == string(from: now) { return t("Today") }
+        if let y = Calendar.current.date(byAdding: .day, value: -1, to: now), iso == string(from: y) { return t("Yesterday") }
         guard let d = date(from: iso) else { return iso }
         let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US")
+        f.locale = Localizer.shared.locale
         let sameYear = Calendar.current.component(.year, from: d) == Calendar.current.component(.year, from: now)
         f.setLocalizedDateFormatFromTemplate(sameYear ? "EEE MMM d" : "EEE MMM d yyyy")
         return f.string(from: d)

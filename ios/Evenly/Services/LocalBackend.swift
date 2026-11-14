@@ -299,13 +299,20 @@ actor LocalBackend: EvenlyBackend {
 
     static func snapshot(_ g: StoredGroup) -> GroupSnapshot {
         let order = Dictionary(uniqueKeysWithValues: g.members.enumerated().map { ($1.id, $0) })
-        let entries = g.entries
-            .map { e in
-                Entry(id: e.id, kind: e.kind, title: e.title, note: e.note, category: e.category, amount: e.amount,
-                      paidBy: e.paidBy, splitMode: e.splitMode, date: e.date, createdAt: e.createdAt, updatedAt: e.updatedAt,
-                      shares: e.shares.sorted { (order[$0.memberId] ?? 0) < (order[$1.memberId] ?? 0) })
+        // Newest date first; ties go to the most recently entered, matching the server's
+        // `ORDER BY date DESC, created_at DESC, rowid DESC` (entries are stored in insertion order).
+        let entries = g.entries.enumerated()
+            .sorted { a, b in
+                if a.element.date != b.element.date { return a.element.date > b.element.date }
+                if a.element.createdAt != b.element.createdAt { return a.element.createdAt > b.element.createdAt }
+                return a.offset > b.offset
             }
-            .sorted { $0.date != $1.date ? $0.date > $1.date : $0.createdAt > $1.createdAt }
+            .map { pair in
+                let e = pair.element
+                return Entry(id: e.id, kind: e.kind, title: e.title, note: e.note, category: e.category, amount: e.amount,
+                             paidBy: e.paidBy, splitMode: e.splitMode, date: e.date, createdAt: e.createdAt, updatedAt: e.updatedAt,
+                             shares: e.shares.sorted { (order[$0.memberId] ?? 0) < (order[$1.memberId] ?? 0) })
+            }
         let balances = Ledger.balances(members: g.members, entries: entries)
         let spent = entries.filter { !$0.isTransfer }
         var byCategory: [String: Int] = [:]

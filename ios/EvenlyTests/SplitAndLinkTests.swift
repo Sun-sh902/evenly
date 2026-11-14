@@ -2,6 +2,17 @@ import XCTest
 @testable import Evenly
 
 final class SplitCalculatorTests: XCTestCase {
+    private var savedLanguage: AppLanguage = .system
+    override func setUp() {
+        super.setUp()
+        savedLanguage = Localizer.shared.choice
+        Localizer.shared.choice = .english // these tests assert English text
+    }
+    override func tearDown() {
+        Localizer.shared.choice = savedLanguage
+        super.tearDown()
+    }
+
     let ids = ["a", "b", "c"]
     let fmt: (Int) -> String = { Money.format($0, currency: "USD", digits: 2) }
 

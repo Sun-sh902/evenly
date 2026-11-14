@@ -81,7 +81,7 @@ struct ExpenseEditor: View {
                     }
                     if entry != nil {
                         Button(role: .destructive) { confirmDelete = true } label: {
-                            Label("Delete expense", systemImage: "trash").frame(maxWidth: .infinity)
+                            Label(t("Delete expense"), systemImage: "trash").frame(maxWidth: .infinity)
                         }
                         .buttonStyle(GhostButtonStyle())
                         .foregroundStyle(Color.neg)
@@ -91,24 +91,24 @@ struct ExpenseEditor: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Color.surface.ignoresSafeArea())
-            .navigationTitle(entry == nil ? "New expense" : "Edit expense")
+            .navigationTitle(entry == nil ? t("New expense") : t("Edit expense"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(t("Cancel")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     if saving { ProgressView() } else {
-                        Button(entry == nil ? "Add" : "Save") { save() }.fontWeight(.semibold)
+                        Button(entry == nil ? t("Add") : t("Save")) { save() }.fontWeight(.semibold)
                     }
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("Done") { focus = nil }
+                    Button(t("Done")) { focus = nil }
                 }
             }
-            .confirmationDialog("Delete this expense?", isPresented: $confirmDelete, titleVisibility: .visible) {
-                Button("Delete", role: .destructive) { remove() }
+            .confirmationDialog(t("Delete this expense?"), isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button(t("Delete"), role: .destructive) { remove() }
             } message: {
-                Text("Balances will be recalculated for everyone.")
+                Text(t("Balances will be recalculated for everyone."))
             }
             .onAppear { if entry == nil { focus = .amount } }
         }
@@ -134,12 +134,12 @@ struct ExpenseEditor: View {
                             .replacingOccurrences(of: ",", with: ".")
                         if filtered != v { amount = filtered }
                     }
-                    .accessibilityLabel("Amount")
+                    .accessibilityLabel(t("Amount"))
             }
             .frame(maxWidth: .infinity)
             .lineLimit(1)
 
-            TextField("What was it for?", text: $title)
+            TextField(t("What was it for?"), text: $title)
                 .multilineTextAlignment(.center)
                 .font(.system(size: 17))
                 .focused($focus, equals: .title)
@@ -149,7 +149,7 @@ struct ExpenseEditor: View {
                 .background(Color.fieldBackground, in: Capsule())
                 .overlay(Capsule().strokeBorder(Color.line))
                 .frame(maxWidth: 360)
-                .accessibilityLabel("Description")
+                .accessibilityLabel(t("Description"))
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
@@ -157,7 +157,7 @@ struct ExpenseEditor: View {
 
     private var categoryPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Category").font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
+            Text(t("Category")).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(app.categories, id: \.self) { c in
@@ -184,7 +184,7 @@ struct ExpenseEditor: View {
 
     private var payerPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Paid by").font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
+            Text(t("Paid by")).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
             FlowLayout(spacing: 8) {
                 ForEach(group.members) { m in
                     PersonChip(name: m.name, colorIndex: group.colorIndex(of: m.id), selected: paidBy == m.id) { paidBy = m.id }
@@ -197,10 +197,10 @@ struct ExpenseEditor: View {
         let p = preview
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Split").font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
+                Text(t("Split")).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
                 Spacer()
             }
-            Picker("Split method", selection: $mode) {
+            Picker(t("Split method"), selection: $mode) {
                 ForEach(SplitMode.allCases) { Text($0.label).tag($0) }
             }
             .pickerStyle(.segmented)
@@ -219,7 +219,7 @@ struct ExpenseEditor: View {
                 Text(p.message)
                     .foregroundStyle(p.tone == .bad ? Color.neg : p.tone == .good ? Color.pos : Color.ink3)
                 Spacer()
-                Text("\(included.count)/\(group.members.count) people").foregroundStyle(Color.ink3)
+                Text(t("%@/%@ people", String(included.count), String(group.members.count))).foregroundStyle(Color.ink3)
             }
             .font(.system(size: 13))
             .padding(.horizontal, 4)
@@ -238,7 +238,7 @@ struct ExpenseEditor: View {
                     .foregroundStyle(on ? Color.ink : Color.lineStrong)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Include \(m.name)")
+            .accessibilityLabel(t("Include %@", m.name))
             .accessibilityAddTraits(on ? .isSelected : [])
 
             Avatar(name: m.name, colorIndex: group.colorIndex(of: m.id), size: 30).opacity(on ? 1 : 0.45)
@@ -263,9 +263,9 @@ struct ExpenseEditor: View {
                 .frame(width: 100, height: 38)
                 .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.line))
-                .accessibilityLabel("\(m.name) \(mode.label.lowercased())")
+                .accessibilityLabel("\(m.name) \(mode.label)")
             } else {
-                Text(on ? group.format(share) : "not included")
+                Text(on ? group.format(share) : t("not included"))
                     .font(on ? .amount(14) : .system(size: 13))
                     .foregroundStyle(on ? Color.ink2 : Color.ink3)
             }
@@ -277,12 +277,12 @@ struct ExpenseEditor: View {
 
     private var detailsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            DatePicker("Date", selection: $date, in: ...Date.distantFuture, displayedComponents: .date)
+            DatePicker(t("Date"), selection: $date, in: ...Date.distantFuture, displayedComponents: .date)
                 .font(.system(size: 15))
-                .environment(\.locale, Locale(identifier: "en_US"))
+                .environment(\.locale, Localizer.shared.locale)
             VStack(alignment: .leading, spacing: 8) {
-                Text("Note (optional)").font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
-                TextField("Receipt number, details", text: $note, axis: .vertical)
+                Text(t("Note (optional)")).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2)
+                TextField(t("Receipt number, details"), text: $note, axis: .vertical)
                     .lineLimit(1...4)
                     .focused($focus, equals: .note)
                     .padding(.vertical, 12)
@@ -305,14 +305,14 @@ struct ExpenseEditor: View {
     private func save() {
         focus = nil
         guard let minor, minor > 0 else {
-            error = group.digits > 0 ? "Enter an amount, like 24.50." : "Enter a whole amount, like 2400."
+            error = group.digits > 0 ? t("Enter an amount, like 24.50.") : t("Enter a whole amount, like 2400.")
             focus = .amount
             return
         }
         let trimmed = title.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { error = "Add a short description."; focus = .title; return }
+        guard !trimmed.isEmpty else { error = t("Add a short description."); focus = .title; return }
         let p = preview
-        guard p.isValid else { error = p.message.isEmpty ? "Check how the cost is split." : p.message; return }
+        guard p.isValid else { error = p.message.isEmpty ? t("Check how the cost is split.") : p.message; return }
 
         let ids = group.members.map(\.id).filter { included.contains($0) }
         let payload = ExpensePayload(
@@ -333,7 +333,7 @@ struct ExpenseEditor: View {
             do {
                 try await store.saveExpense(payload, editing: entry?.id)
                 dismiss()
-                onSaved(entry == nil ? "\(trimmed) added" : "Changes saved")
+                onSaved(entry == nil ? t("%@ added", trimmed) : t("Changes saved"))
             } catch {
                 self.error = error.localizedDescription
             }
@@ -348,7 +348,7 @@ struct ExpenseEditor: View {
             do {
                 try await store.deleteEntry(entry.id)
                 dismiss()
-                onSaved("Expense deleted")
+                onSaved(t("Expense deleted"))
             } catch {
                 self.error = error.localizedDescription
             }

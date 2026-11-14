@@ -21,6 +21,7 @@ enum GroupSheet: Identifiable {
 enum ActivityFilter: String, CaseIterable, Identifiable {
     case all = "All", expenses = "Expenses", payments = "Payments"
     var id: String { rawValue }
+    var label: String { t(rawValue) }
 }
 
 struct GroupScreen: View {
@@ -60,11 +61,11 @@ struct GroupScreen: View {
         case .loading:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         case .missing:
-            unavailable("Nothing here", "This group was deleted, or the link is mistyped.")
+            unavailable(t("Nothing here"), t("This group was deleted, or the link is mistyped."))
         case .failed(let message):
             VStack(spacing: 16) {
-                unavailable("Can't load this group", message)
-                Button("Try again") { Task { await store.load() } }.buttonStyle(GhostButtonStyle())
+                unavailable(t("Can't load this group"), message)
+                Button(t("Try again")) { Task { await store.load() } }.buttonStyle(GhostButtonStyle())
             }
         case .ready:
             if let g = store.group { ready(g, store) }
@@ -112,32 +113,32 @@ struct GroupScreen: View {
             ToolbarItem(placement: .principal) { Text("").accessibilityHidden(true) }
             if let link = store.inviteLink {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ShareLink(item: link, subject: Text(g.name), message: Text("Join \(g.name) on Evenly")) {
+                    ShareLink(item: link, subject: Text(g.name), message: Text(t("Join %@ on Evenly", g.name))) {
                         Image(systemName: "square.and.arrow.up")
                     }
-                    .accessibilityLabel("Share invite link")
+                    .accessibilityLabel(t("Share invite link"))
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button { sheet = .settings } label: { Label("Group settings", systemImage: "gearshape") }
+                    Button { sheet = .settings } label: { Label(t("Group settings"), systemImage: "gearshape") }
                     Button {
                         Task {
                             do { sheet = .export(try await store.exportCSV()) } catch { store.toast = error.localizedDescription }
                         }
-                    } label: { Label("Export CSV", systemImage: "tablecells") }
+                    } label: { Label(t("Export CSV"), systemImage: "tablecells") }
                     if me != nil {
-                        Button { app.setMe(nil, groupId: g.id) } label: { Label("Switch who you are", systemImage: "person.crop.circle") }
+                        Button { app.setMe(nil, groupId: g.id) } label: { Label(t("Switch who you are"), systemImage: "person.crop.circle") }
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
-                .accessibilityLabel("More")
+                .accessibilityLabel(t("More"))
             }
         }
         .overlay(alignment: .bottomTrailing) {
             Button { sheet = .newExpense } label: {
-                Label("Add expense", systemImage: "plus")
+                Label(t("Add expense"), systemImage: "plus")
             }
             .buttonStyle(PrimaryButtonStyle())
             .shadow(color: .black.opacity(0.25), radius: 18, y: 10)
@@ -156,7 +157,7 @@ struct GroupScreen: View {
                 PaymentEditor(store: store, group: g, entry: entry, suggestion: suggestion) { savedMessage($0) }
             case .settings:
                 GroupSettingsView(store: store, group: g, me: me) { deleted in
-                    if deleted { app.path.removeAll() } else { savedMessage("Settings saved") }
+                    if deleted { app.path.removeAll() } else { savedMessage(t("Settings saved")) }
                 }
             case .export(let url):
                 ShareSheet(items: [url]).presentationDetents([.medium, .large])
@@ -166,7 +167,7 @@ struct GroupScreen: View {
 
     private func header(_ g: GroupSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("\(g.members.count) \(g.members.count == 1 ? "person" : "people") · \(g.currency)")
+            Text("\(tCount(g.members.count, one: "%@ person", other: "%@ people")) · \(g.currency)")
                 .font(.system(size: 13)).foregroundStyle(Color.ink3)
             Text(g.name).font(.display(38)).tracking(-0.8).lineLimit(2).minimumScaleFactor(0.7)
         }
@@ -198,8 +199,8 @@ private struct MeBar: View {
     private var ask: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Which one are you?").font(.system(size: 16, weight: .semibold))
-                Text("Evenly will show your own balance and pick you as the payer. Saved on this device only.")
+                Text(t("Which one are you?")).font(.system(size: 16, weight: .semibold))
+                Text(t("Evenly will show your own balance and pick you as the payer. Saved on this device only."))
                     .font(.system(size: 13)).foregroundStyle(Color.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -222,27 +223,27 @@ private struct MeBar: View {
         return HStack(spacing: 14) {
             Avatar(name: group.name(of: me), colorIndex: group.colorIndex(of: me), size: 42)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Viewing as \(group.name(of: me))").font(.system(size: 13)).foregroundStyle(Color.ink3)
+                Text(t("Viewing as %@", group.name(of: me))).font(.system(size: 13)).foregroundStyle(Color.ink3)
                 Group {
                     if net > 0 {
-                        Text("You get back ") + Text(group.format(net)).font(.amount(17)).foregroundColor(.pos)
+                        Text(t("You get back") + " ") + Text(group.format(net)).font(.amount(17)).foregroundColor(.pos)
                     } else if net < 0 {
-                        Text("You owe ") + Text(group.format(-net)).font(.amount(17)).foregroundColor(.neg)
+                        Text(t("You owe") + " ") + Text(group.format(-net)).font(.amount(17)).foregroundColor(.neg)
                     } else {
-                        Text(group.entries.isEmpty ? "Nothing logged yet" : "You're all square")
+                        Text(group.entries.isEmpty ? t("Nothing logged yet") : t("You're all square"))
                     }
                 }
                 .font(.system(size: 17))
                 let others = (net < 0 ? owes.map { group.name(of: $0.to) } : owed.map { group.name(of: $0.from) })
                 if !others.isEmpty {
-                    Text("\(net < 0 ? "to" : "from") \(others.joined(separator: ", "))")
+                    Text(net < 0 ? t("to %@", others.joined(separator: ", ")) : t("from %@", others.joined(separator: ", ")))
                         .font(.system(size: 13)).foregroundStyle(Color.ink3).lineLimit(1)
                 }
             }
             Spacer(minLength: 0)
             if net < 0, let first = owes.first {
                 Button { onSettle(first) } label: {
-                    Text("Settle").font(.system(size: 14, weight: .semibold))
+                    Text(t("Settle")).font(.system(size: 14, weight: .semibold))
                 }
                 .buttonStyle(PrimaryButtonStyle(tint: .brand, foreground: .brandInk))
                 .controlSize(.small)
@@ -260,7 +261,7 @@ private struct StatsRow: View {
         let cats = group.stats.byCategory.sorted { $0.value > $1.value }
         VStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Total group spend").font(.system(size: 13, weight: .medium)).foregroundStyle(Color.paper.opacity(0.6))
+                Text(t("Total group spend")).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.paper.opacity(0.6))
                 Text(group.format(group.stats.totalSpent))
                     .font(.display(44)).tracking(-1).lineLimit(1).minimumScaleFactor(0.5)
                     .foregroundStyle(Color.paper)
@@ -291,12 +292,12 @@ private struct StatsRow: View {
             .accessibilityElement(children: .combine)
 
             HStack(spacing: 12) {
-                stat("Expenses logged", "\(group.stats.expenseCount)", detail: nil)
+                stat(t("Expenses logged"), "\(group.stats.expenseCount)", detail: nil)
                 if let top = cats.first {
-                    stat("Biggest category", CategoryStyle.of(top.key).label,
+                    stat(t("Biggest category"), CategoryStyle.of(top.key).label,
                          detail: "\(Int((Double(top.value) / Double(max(1, group.stats.totalSpent)) * 100).rounded()))%")
                 } else {
-                    stat("Biggest category", "-", detail: nil)
+                    stat(t("Biggest category"), "-", detail: nil)
                 }
             }
         }
@@ -322,7 +323,7 @@ private struct BalancesCard: View {
     var body: some View {
         let maxAbs = max(1, group.balances.map { abs($0.net) }.max() ?? 1)
         VStack(alignment: .leading, spacing: 12) {
-            Text("Balances").sectionTitle()
+            Text(t("Balances")).sectionTitle()
             ForEach(group.balances, id: \.memberId) { b in
                 HStack(spacing: 12) {
                     Avatar(name: group.name(of: b.memberId), colorIndex: group.colorIndex(of: b.memberId))
@@ -330,7 +331,7 @@ private struct BalancesCard: View {
                         HStack(spacing: 6) {
                             Text(group.name(of: b.memberId)).font(.system(size: 15, weight: .medium)).lineLimit(1)
                             if b.memberId == me {
-                                Text("you").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.brand)
+                                Text(t("you")).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.brand)
                                     .padding(.horizontal, 7).padding(.vertical, 1)
                                     .background(Color.brandSoft, in: Capsule())
                             }
@@ -341,7 +342,7 @@ private struct BalancesCard: View {
                         Text(b.net == 0 ? group.format(0) : group.format(b.net, signed: true))
                             .font(.amount(14))
                             .foregroundStyle(b.net > 0 ? Color.pos : b.net < 0 ? Color.neg : Color.ink3)
-                        Text(b.net > 0 ? "gets back" : b.net < 0 ? "owes" : "all square")
+                        Text(b.net > 0 ? t("gets back") : b.net < 0 ? t("owes") : t("all square"))
                             .font(.system(size: 12)).foregroundStyle(Color.ink3)
                     }
                     // Fixed column so every bar shares the same centre line.
@@ -387,39 +388,39 @@ private struct SettleCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Settle up").sectionTitle()
+                Text(t("Settle up")).sectionTitle()
                 Spacer()
                 if !group.transfers.isEmpty {
-                    Text("\(group.transfers.count) payment\(group.transfers.count == 1 ? "" : "s")")
+                    Text(tCount(group.transfers.count, one: "%@ payment", other: "%@ payments"))
                         .font(.system(size: 12)).foregroundStyle(Color.ink3)
                 }
             }
             if group.entries.isEmpty {
-                Text("Suggested payments appear here once you log something.")
+                Text(t("Suggested payments appear here once you log something."))
                     .font(.system(size: 14)).foregroundStyle(Color.ink3)
             } else if group.transfers.isEmpty {
-                Label("Everyone is settled up. Nice.", systemImage: "party.popper")
+                Label(t("Everyone is settled up. Nice."), systemImage: "party.popper")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Color.pos)
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.posSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             } else {
-                ForEach(group.transfers, id: \.self) { t in
+                ForEach(group.transfers, id: \.self) { tr in
                     HStack(spacing: 12) {
-                        Avatar(name: group.name(of: t.from), colorIndex: group.colorIndex(of: t.from))
+                        Avatar(name: group.name(of: tr.from), colorIndex: group.colorIndex(of: tr.from))
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                Text(group.name(of: t.from)).fontWeight(.semibold)
+                                Text(group.name(of: tr.from)).fontWeight(.semibold)
                                 Image(systemName: "arrow.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.ink3)
-                                Text(group.name(of: t.to))
+                                Text(group.name(of: tr.to))
                             }
                             .font(.system(size: 14))
                             .lineLimit(1)
-                            Text(group.format(t.amount)).font(.amount(14))
+                            Text(group.format(tr.amount)).font(.amount(14))
                         }
                         Spacer(minLength: 0)
-                        Button("Mark paid") { onRecord(t) }
+                        Button(t("Mark paid")) { onRecord(tr) }
                             .font(.system(size: 13, weight: .semibold))
                             .padding(.horizontal, 12).frame(height: 32)
                             .background(Color.surface, in: Capsule())
@@ -431,7 +432,7 @@ private struct SettleCard: View {
                     .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.line))
                     .accessibilityElement(children: .combine)
-                    .accessibilityAction(named: "Mark paid") { onRecord(t) }
+                    .accessibilityAction(named: Text(t("Mark paid"))) { onRecord(tr) }
                 }
             }
         }
@@ -464,19 +465,19 @@ private struct ActivitySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Activity").font(.display(28)).tracking(-0.5)
+                Text(t("Activity")).font(.display(28)).tracking(-0.5)
                 Spacer()
             }
             .padding(.top, 8)
             if !group.entries.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Color.ink3)
-                    TextField("Search expenses", text: $query)
+                    TextField(t("Search expenses"), text: $query)
                         .submitLabel(.search)
                         .autocorrectionDisabled()
                     if !query.isEmpty {
                         Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.ink3) }
-                            .accessibilityLabel("Clear search")
+                            .accessibilityLabel(t("Clear search"))
                     }
                 }
                 .padding(.horizontal, 14)
@@ -484,15 +485,15 @@ private struct ActivitySection: View {
                 .background(Color.surface, in: Capsule())
                 .overlay(Capsule().strokeBorder(Color.line))
             }
-            Picker("Filter", selection: $filter) {
-                ForEach(ActivityFilter.allCases) { Text($0.rawValue).tag($0) }
+            Picker(t("Filter"), selection: $filter) {
+                ForEach(ActivityFilter.allCases) { Text($0.label).tag($0) }
             }
             .pickerStyle(.segmented)
 
             if group.entries.isEmpty {
                 empty
             } else if visible.isEmpty {
-                Text("No matches. Try a different search or filter.")
+                Text(t("No matches. Try a different search or filter."))
                     .font(.system(size: 15)).foregroundStyle(Color.ink3)
                     .frame(maxWidth: .infinity).padding(.vertical, 32)
             } else {
@@ -529,17 +530,17 @@ private struct ActivitySection: View {
 
     private func row(_ e: Entry) -> some View {
         let style = CategoryStyle.of(e.category)
-        let payer = e.paidBy == me ? "You" : group.name(of: e.paidBy)
+        let payer = e.paidBy == me ? t("You") : group.name(of: e.paidBy)
         return HStack(spacing: 14) {
             CategoryIcon(category: e.category)
             VStack(alignment: .leading, spacing: 2) {
                 if e.isTransfer {
-                    Text("\(payer) paid \(e.recipient == me ? "you" : group.name(of: e.recipient))")
+                    Text(t("%@ paid %@", payer, e.recipient == me ? t("you (object)") : group.name(of: e.recipient)))
                         .font(.system(size: 15, weight: .medium)).foregroundStyle(Color.ink2)
-                    Text(e.title).font(.system(size: 13)).foregroundStyle(Color.ink3)
+                    Text(e.title == "Settlement" ? t("Settlement") : e.title).font(.system(size: 13)).foregroundStyle(Color.ink3)
                 } else {
                     Text(e.title).font(.system(size: 15, weight: .medium)).foregroundStyle(Color.ink)
-                    Text("\(Text(payer).fontWeight(.medium).foregroundColor(.ink2)) paid · \(summary(e))\(e.note.isEmpty ? "" : " · \(e.note)")")
+                    Text("\(Text(payer).fontWeight(.medium).foregroundColor(.ink2)) \(t("paid")) · \(summary(e))\(e.note.isEmpty ? "" : " · \(e.note)")")
                         .font(.system(size: 13)).foregroundStyle(Color.ink3)
                 }
             }
@@ -547,20 +548,20 @@ private struct ActivitySection: View {
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
                 Text(group.format(e.amount)).font(.amount(15)).foregroundStyle(e.isTransfer ? Color.pos : Color.ink)
-                Text(e.isTransfer ? "payment" : style.label).font(.system(size: 12)).foregroundStyle(Color.ink3)
+                Text(e.isTransfer ? t("payment") : style.label).font(.system(size: 12)).foregroundStyle(Color.ink3)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Opens for editing")
+        .accessibilityHint(t("Opens for editing"))
     }
 
     private func summary(_ e: Entry) -> String {
         let mode = SplitMode(rawValue: e.splitMode) ?? .equal
         if mode == .equal {
-            return e.shares.count == group.members.count ? "split equally" : "split \(e.shares.count) way\(e.shares.count == 1 ? "" : "s")"
+            return e.shares.count == group.members.count ? t("split equally") : tCount(e.shares.count, one: "split %@ way", other: "split %@ ways")
         }
         return mode.summary
     }
@@ -577,10 +578,10 @@ private struct ActivitySection: View {
                     .offset(x: 12)
             }
             .padding(.bottom, 8)
-            Text("A clean slate").font(.display(28))
-            Text("Log the first expense and Evenly keeps a running tally of who owes whom.")
+            Text(t("A clean slate")).font(.display(28))
+            Text(t("Log the first expense and Evenly keeps a running tally of who owes whom."))
                 .font(.system(size: 15)).foregroundStyle(Color.ink3).multilineTextAlignment(.center)
-            Button(action: onAdd) { Label("Add the first expense", systemImage: "plus") }
+            Button(action: onAdd) { Label(t("Add the first expense"), systemImage: "plus") }
                 .buttonStyle(PrimaryButtonStyle())
                 .padding(.top, 4)
         }

@@ -32,7 +32,7 @@ final class GroupStore {
     var inviteLink: URL? { backend?.inviteLink(for: groupId) }
 
     func load() async {
-        guard let backend else { phase = .failed("Set a server address in Settings."); return }
+        guard let backend else { phase = .failed(t("Set a server address in Settings.")); return }
         if group == nil { phase = .loading }
         do {
             if let g = try await backend.group(groupId, knownRevision: nil) { apply(g) }
@@ -50,7 +50,7 @@ final class GroupStore {
         do {
             if let fresh = try await backend.group(groupId, knownRevision: current.revision), fresh.revision > current.revision {
                 apply(fresh)
-                if announce { toast = "Updated with the latest changes" }
+                if announce { toast = t("Updated with the latest changes") }
             }
         } catch let e as APIError where e.status == 404 {
             app?.forget(groupId)
