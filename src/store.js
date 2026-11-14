@@ -130,7 +130,7 @@ export function openStore(file = ':memory:') {
       split_mode = ?, date = ?, updated_at = ? WHERE id = ? AND group_id = ?`),
     getEntry: db.prepare('SELECT * FROM entries WHERE id = ? AND group_id = ?'),
     deleteEntry: db.prepare('DELETE FROM entries WHERE id = ? AND group_id = ?'),
-    entries: db.prepare('SELECT * FROM entries WHERE group_id = ? ORDER BY date DESC, created_at DESC'),
+    entries: db.prepare('SELECT * FROM entries WHERE group_id = ? ORDER BY date DESC, created_at DESC, rowid DESC'),
     groupShares: db.prepare('SELECT s.* FROM shares s JOIN entries e ON e.id = s.entry_id WHERE e.group_id = ?'),
     insertShare: db.prepare('INSERT INTO shares (entry_id, member_id, share, weight) VALUES (?, ?, ?, ?)'),
     deleteShares: db.prepare('DELETE FROM shares WHERE entry_id = ?'),
