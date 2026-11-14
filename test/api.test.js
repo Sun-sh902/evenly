@@ -380,3 +380,13 @@ test('opens databases created before the revision column existed', () => {
     app.store.close();
   }
 });
+
+test('a missing date defaults to the local calendar day, not UTC', async () => {
+  const g = (await api('POST', '/api/groups', { name: 'Dates', members: ['A'] })).json;
+  const r = await api('POST', `/api/groups/${g.id}/entries`, {
+    title: 'No date', amount: '1', paidBy: g.members[0].id, split: { mode: 'equal', participants: [{ memberId: g.members[0].id }] },
+  });
+  const now = new Date();
+  const local = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  assert.equal(r.json.group.entries[0].date, local);
+});
