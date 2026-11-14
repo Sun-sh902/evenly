@@ -31,7 +31,7 @@ Evenly does exactly that, and you can host it yourself with a single command.
 - **CSV export**, with spreadsheet-formula injection neutralised.
 - **15 currencies**, including zero-decimal ones (JPY, KRW).
 - Light and dark themes, a mobile bottom sheet, keyboard shortcuts (`N` adds an expense, `/` jumps to search).
-- **Native iOS app** (SwiftUI, iOS 17+) that shares groups with the web app. See [ios/README.md](ios/README.md).
+- **Native iOS app** (SwiftUI, iOS 17+). It works fully offline with data stored on the iPhone, or shares groups with the web app through a server. See [ios/README.md](ios/README.md).
 
 ## Quick start
 
