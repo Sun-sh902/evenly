@@ -14,7 +14,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     hero
                     actions
-                    if app.recents.isEmpty { howItWorks } else { recentList }
+                    if app.groupList.isEmpty { howItWorks } else { recentList }
                     serverStatus
                 }
                 .padding(.horizontal, 20)
@@ -25,7 +25,7 @@ struct HomeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showServer = true } label: { Image(systemName: "gearshape") }
-                        .accessibilityLabel("Server settings")
+                        .accessibilityLabel("Settings")
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -33,7 +33,10 @@ struct HomeView: View {
             .sheet(isPresented: $showCreate) { CreateGroupView() }
             .sheet(isPresented: $showJoin) { JoinGroupView() }
             .sheet(isPresented: $showServer, onDismiss: { Task { await checkServer() } }) { ServerSettingsView() }
-            .task(id: app.serverAddress) { await checkServer() }
+            .task(id: "\(app.mode.rawValue)|\(app.serverAddress)") {
+                await app.refreshLocalGroups()
+                await checkServer()
+            }
             .toast($app.pendingNotice)
         }
         .tint(.ink)
@@ -67,7 +70,9 @@ struct HomeView: View {
             .minimumScaleFactor(0.7)
             .accessibilityElement(children: .combine)
 
-            Text("Track shared costs for trips, flats and dinners. Nobody signs up and nobody hits a limit. Share one link and the whole group is in.")
+            Text(app.isLocal
+                 ? "Track shared costs for trips, flats and dinners. No sign-up, no limits, and everything stays on this iPhone, even offline."
+                 : "Track shared costs for trips, flats and dinners. Nobody signs up and nobody hits a limit. Share one link and the whole group is in.")
                 .font(.system(size: 16))
                 .foregroundStyle(Color.ink2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -80,11 +85,13 @@ struct HomeView: View {
                 Label("New group", systemImage: "plus").frame(maxWidth: .infinity)
             }
             .buttonStyle(PrimaryButtonStyle())
-            Button { showJoin = true } label: {
-                Label("Join", systemImage: "link").frame(maxWidth: .infinity)
+            if !app.isLocal {
+                Button { showJoin = true } label: {
+                    Label("Join", systemImage: "link").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(GhostButtonStyle())
+                .frame(maxWidth: 140)
             }
-            .buttonStyle(GhostButtonStyle())
-            .frame(maxWidth: 140)
         }
     }
 
@@ -93,14 +100,17 @@ struct HomeView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Your groups").font(.display(28)).tracking(-0.5)
                 Spacer()
-                Text("On this device").font(.system(size: 13)).foregroundStyle(Color.ink3)
+                Text(app.isLocal ? "Saved on this iPhone" : "Opened on this device").font(.system(size: 13)).foregroundStyle(Color.ink3)
             }
-            ForEach(app.recents) { r in
+            ForEach(app.groupList) { r in
                 NavigationLink(value: r.id) { RecentCard(item: r) }
                     .buttonStyle(.plain)
                     .contextMenu {
-                        Button(role: .destructive) { withAnimation { app.forget(r.id) } } label: {
-                            Label("Remove from this device", systemImage: "minus.circle")
+                        // Local groups are deleted from Group settings, where the confirmation lives.
+                        if !app.isLocal {
+                            Button(role: .destructive) { withAnimation { app.forget(r.id) } } label: {
+                                Label("Remove from this device", systemImage: "minus.circle")
+                            }
                         }
                     }
             }
@@ -129,21 +139,29 @@ struct HomeView: View {
     private var serverStatus: some View {
         Button { showServer = true } label: {
             HStack(spacing: 8) {
-                Circle()
-                    .fill(serverOK == nil ? Color.ink3 : serverOK == true ? Color.pos : Color.neg)
-                    .frame(width: 8, height: 8)
-                Text(serverOK == false ? "Can't reach \(app.serverURL?.host ?? "server")" : "Server: \(app.serverURL?.host ?? "not set")")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.ink3)
+                if app.isLocal {
+                    Image(systemName: "iphone").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.pos)
+                    Text("Stored on this iPhone · works offline")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.ink3)
+                } else {
+                    Circle()
+                        .fill(serverOK == nil ? Color.ink3 : serverOK == true ? Color.pos : Color.neg)
+                        .frame(width: 8, height: 8)
+                    Text(serverOK == false ? "Can't reach \(app.serverURL?.host ?? "server")" : "Server: \(app.serverURL?.host ?? "not set")")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.ink3)
+                }
                 Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.ink3)
             }
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
-        .accessibilityHint("Opens server settings")
+        .accessibilityHint("Opens settings")
     }
 
     private func checkServer() async {
+        guard !app.isLocal else { await app.refreshMeta(); return }
         serverOK = nil
         serverOK = (try? await app.client?.health()) ?? false
         if serverOK == true { await app.refreshMeta() }

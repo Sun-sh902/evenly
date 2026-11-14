@@ -128,12 +128,12 @@ struct CreateGroupView: View {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { error = "Give your group a name."; focus = .name; return }
         guard !people.isEmpty else { error = "Add at least one person."; focus = .person; return }
-        guard let client = app.client else { error = "Set a server address first."; return }
+        guard let backend = app.backend else { error = "Set a server address first."; return }
         saving = true
         Task {
             defer { saving = false }
             do {
-                let g = try await client.createGroup(name: trimmed, currency: currency, members: people)
+                let g = try await backend.createGroup(name: trimmed, currency: currency, members: people)
                 app.remember(g)
                 dismiss()
                 try? await Task.sleep(for: .milliseconds(350))

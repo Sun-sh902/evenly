@@ -110,13 +110,13 @@ struct GroupScreen: View {
         .toolbar {
             // The large serif header already names the group; keep the bar clean.
             ToolbarItem(placement: .principal) { Text("").accessibilityHidden(true) }
-            ToolbarItem(placement: .topBarTrailing) {
-                ShareLink(item: app.client?.webLink(for: g.id) ?? URL(string: "https://github.com/Sun-sh902/evenly")!,
-                          subject: Text(g.name),
-                          message: Text("Join \(g.name) on Evenly")) {
-                    Image(systemName: "square.and.arrow.up")
+            if let link = store.inviteLink {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink(item: link, subject: Text(g.name), message: Text("Join \(g.name) on Evenly")) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel("Share invite link")
                 }
-                .accessibilityLabel("Share invite link")
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

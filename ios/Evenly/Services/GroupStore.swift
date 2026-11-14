@@ -17,18 +17,25 @@ final class GroupStore {
 
     private weak var app: AppState?
 
+    /// Bound once: a group lives either on this iPhone or on a server.
+    private let backend: (any EvenlyBackend)?
+
     init(groupId: String, app: AppState) {
         self.groupId = groupId
         self.app = app
+        backend = app.backend
     }
 
-    private var client: APIClient? { app?.client }
+    /// Local data can only change on this device, so there is nothing to poll for.
+    var needsPolling: Bool { !(backend?.isLocal ?? true) }
+
+    var inviteLink: URL? { backend?.inviteLink(for: groupId) }
 
     func load() async {
-        guard let client else { phase = .failed("Set a server address in Settings."); return }
+        guard let backend else { phase = .failed("Set a server address in Settings."); return }
         if group == nil { phase = .loading }
         do {
-            if let g = try await client.group(groupId) { apply(g) }
+            if let g = try await backend.group(groupId, knownRevision: nil) { apply(g) }
         } catch let e as APIError where e.status == 404 {
             app?.forget(groupId)
             phase = .missing
@@ -39,9 +46,9 @@ final class GroupStore {
 
     /// Cheap conditional refresh; the server answers 304 when nothing changed.
     func refresh(announce: Bool = false) async {
-        guard let client, let current = group, !isEditing else { return }
+        guard let backend, let current = group, !isEditing else { return }
         do {
-            if let fresh = try await client.group(groupId, knownRevision: current.revision), fresh.revision > current.revision {
+            if let fresh = try await backend.group(groupId, knownRevision: current.revision), fresh.revision > current.revision {
                 apply(fresh)
                 if announce { toast = "Updated with the latest changes" }
             }
@@ -54,6 +61,7 @@ final class GroupStore {
     }
 
     func pollForever(every seconds: Double = 12) async {
+        guard needsPolling else { return }
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(seconds))
             if Task.isCancelled { break }
@@ -69,17 +77,17 @@ final class GroupStore {
 
     // MARK: Mutations. Each throws APIError so sheets can show inline messages.
 
-    private func requireClient() throws -> APIClient {
-        guard let client else { throw APIError(status: 0, message: "no server configured", field: nil) }
-        return client
+    private func requireClient() throws -> any EvenlyBackend {
+        guard let backend else { throw APIError(status: 0, message: "no server configured", field: nil) }
+        return backend
     }
 
     func saveExpense(_ payload: ExpensePayload, editing entryId: String?) async throws {
         let c = try requireClient()
         if let entryId {
-            apply(try await c.updateEntry(groupId, entryId: entryId, payload))
+            apply(try await c.updateExpense(groupId, entryId: entryId, payload))
         } else {
-            apply(try await c.addEntry(groupId, payload).group)
+            apply(try await c.addExpense(groupId, payload).group)
         }
         app?.setLastPayer(payload.paidBy, groupId: groupId)
     }
@@ -87,9 +95,9 @@ final class GroupStore {
     func savePayment(_ payload: TransferPayload, editing entryId: String?) async throws {
         let c = try requireClient()
         if let entryId {
-            apply(try await c.updateEntry(groupId, entryId: entryId, payload))
+            apply(try await c.updateTransfer(groupId, entryId: entryId, payload))
         } else {
-            apply(try await c.addEntry(groupId, payload).group)
+            apply(try await c.addTransfer(groupId, payload).group)
         }
     }
 
