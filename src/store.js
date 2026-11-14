@@ -102,6 +102,10 @@ export function openStore(file = ':memory:') {
       weight REAL,
       PRIMARY KEY (entry_id, member_id)
     );
+    -- Foreign keys pointing at members need their own indexes: without them, removing a
+    -- person or deleting a group scans every entry and share in the database.
+    CREATE INDEX IF NOT EXISTS entries_paid_by ON entries(paid_by);
+    CREATE INDEX IF NOT EXISTS shares_member ON shares(member_id);
   `);
 
   // Migration for databases created before the revision column existed.
