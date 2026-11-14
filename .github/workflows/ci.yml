@@ -22,6 +22,27 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm test
 
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Start an Evenly server for the end-to-end test
+        run: |
+          EVENLY_DB="$RUNNER_TEMP/ci.db" QUIET=1 EVENLY_RATE_LIMIT=off node src/server.js &
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:4173/api/health && break; sleep 1; done
+      - name: Build and test the iOS app
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k,v in sorted(d.items(), reverse=True) if 'iOS' in k for x in v if x['name'].startswith('iPhone')))")
+          echo "Using simulator $UDID"
+          xcodebuild test \
+            -project ios/Evenly.xcodeproj \
+            -scheme Evenly \
+            -destination "id=$UDID" \
+            CODE_SIGNING_ALLOWED=NO
+
   docker:
     runs-on: ubuntu-latest
     steps:
